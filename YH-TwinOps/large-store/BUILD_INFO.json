@@ -1,0 +1,16 @@
+{
+  "built_utc": "2026-11-14T05:29:16.062216+00:00",
+  "store": "Yonghui Hanhai Haishang store zoning-inspired synthetic teaching prototype",
+  "dimensions": "80m x 50m synthetic, NOT actual measurements",
+  "public_observer_layout": "https://q6.itc.cn/images01/20241217/f7f32f58804a49608a499daf27d42f00.jpeg",
+  "storewright_integration": "documented only; no claim of merged repository or deployment",
+  "testing": {
+    "node_syntax": "passed",
+    "sim_engine_unit_tests": "5 passed",
+    "static_server_http": "passed",
+    "agent_local_api": "passed",
+    "glb_load": "passed",
+    "browser_webgl": "not verified due to environment browser restrictions"
+  },
+  "runtime": "Python 3.10+ for server; modern browser with WebGL2 and Three.js served via CDN or local npm install"
+}

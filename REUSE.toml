@@ -74,3 +74,19 @@ SPDX-License-Identifier = "CC-BY-4.0"
 path = "CODE_OF_CONDUCT.md"
 SPDX-FileCopyrightText = ["Contributor Covenant contributors", "2026 Glacieerr"]
 SPDX-License-Identifier = "CC-BY-4.0"
+
+# Part 4 (YH-TwinOps/): code AGPL-3.0-only; documentation and generated assets (GLB models, floor plans,
+# previews, the Blender scene map file) CC BY 4.0 — matching how parts 2 and 3 are annotated.
+# 第四部分（YH-TwinOps/）：代码 AGPL-3.0-only；文档和生成资产（GLB 模型、平面图、预览图、Blender 场景文件）CC BY 4.0，与第二、三部分的标注方式一致。
+[[annotations]]
+path = ["YH-TwinOps/**"]
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+[[annotations]]
+path = [
+  "YH-TwinOps/*.md", "YH-TwinOps/**/*.md", "YH-TwinOps/large-store/docs/**",
+  "YH-TwinOps/large-store/assets/**", "YH-TwinOps/scene-map/*.png", "YH-TwinOps/scene-map/*.blend",
+]
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "CC-BY-4.0"

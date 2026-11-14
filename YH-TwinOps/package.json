@@ -1,0 +1,28 @@
+{
+  "name": "yh-twinops",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "YH TwinOps: a Yonghui-inspired synthetic large-store digital twin teaching prototype - Three.js 3D store, deterministic layout-decision agent flow, paired shopper simulation on fixed seeds, plus a Blender fresh-area scene map. Independent portfolio part alongside StoreX and StoreX-Chain.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Glacieerr/storewright.git",
+    "directory": "YH-TwinOps"
+  },
+  "homepage": "https://github.com/Glacieerr/storewright/tree/main/YH-TwinOps#readme",
+  "bugs": {
+    "url": "https://github.com/Glacieerr/storewright/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "python3 large-store/server.py",
+    "test": "node --test large-store/tests/",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}

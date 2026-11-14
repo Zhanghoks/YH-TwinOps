@@ -1,4 +1,4 @@
-// 在线演示站点的首页（site/index.html）：三个部分和开发者入口放在一页上，第一次来的人一眼看到从哪开始。
+// 在线演示站点的首页（site/index.html）：四个部分和开发者入口放在一页上，第一次来的人一眼看到从哪开始。
 // 由 scripts/build-site.mjs 调用；纯静态、不依赖网络，跟随系统的浅色 / 深色，手机宽度可用。
 // Landing page of the live demo: the three parts and the developer entry points on one page.
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -47,7 +47,7 @@ footer a { color: inherit; }
 </head>
 <body>
 <main>
-<h1>Storewright · StoreX · StoreX Chain</h1>
+<h1>Storewright · StoreX · StoreX Chain · YH TwinOps</h1>
 <p class="lead">A personal open-source portfolio project: digital twins of grocery store operations and of a store's whole supply chain, from ship to shelf. Everything below runs in your browser — no install, no account.</p>
 <p class="lead">个人开源作品集：门店运营和整条供应链（从远洋到货架）的数字孪生。下面的一切都在浏览器里运行，不用安装、不用账号。</p>
 ${opt.hero ? `<div class="hero"><img src="${opt.hero}" alt="Guided tour: one container travels from the ship through the port, the logistics park and the distribution centre to the store's shelf" width="960" height="540" /></div>` : ''}
@@ -80,6 +80,16 @@ ${opt.hero ? `<div class="hero"><img src="${opt.hero}" alt="Guided tour: one con
     <p>The store redesigned for 2030 and compared item by item with the previous generation on the same simulation engine.</p>
     <p>为 2030 年重新设计的门店，在同一个仿真引擎上和上一代逐项比较。</p>
     <div class="btns">${link('./storex/', 'Open the StoreX simulator', '打开 StoreX 模拟器', true)}</div>
+  </section>
+  <section class="card">
+    <span class="tag">Part 4 · 第四部分</span>
+    <h2>YH TwinOps · 调改门店数字孪生</h2>
+    <p>A Yonghui-restyling-inspired synthetic teaching store: a 3D large-store twin where a deterministic layout agent proposes, validates and simulates three reshuffling plans, with paired metrics and a mock approval. All data synthetic.</p>
+    <p>参考永辉调改店的合成教学卖场：3D 门店孪生 + 确定性调改 Agent——提出、校验、同种子仿真三个布局方案，配对指标比较、模拟审批。所有数据都是合成的。</p>
+    <div class="btns">
+      ${link('./yh-twinops/index.local.html', 'Open the YH store twin', '打开 YH 门店孪生', true)}
+      ${link('./yh-twinops/index.html', 'CDN version', 'CDN 版备用入口')}
+    </div>
   </section>
   <section class="card">
     <span class="tag">For developers · 开发者</span>

@@ -33,3 +33,12 @@ StoreX-Chain/web/public/assets/fleet.glb
 
 # 临时的探针和调试目录
 .probe-*/
+
+# ZCode 本地状态（工作流草稿、会话配置），不公开
+.zcode/
+
+# YH-TwinOps 的本地生成物与测试输出（Blender 备份/日志/完成标记；Playwright 默认输出目录）
+*.blend1
+YH-TwinOps/scene-map/blender.log
+YH-TwinOps/scene-map/render-done.txt
+test-results/

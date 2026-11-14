@@ -12,7 +12,8 @@
     "packages/*",
     "apps/*",
     "StoreX",
-    "StoreX-Chain"
+    "StoreX-Chain",
+    "YH-TwinOps"
   ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/simulator/tsconfig.json --noEmit && tsc -p apps/associate/tsconfig.json --noEmit && tsc -p e2e/tsconfig.json --noEmit",
@@ -34,6 +35,7 @@
     "build:demo": "npm run build:demo -w @storewright/associate",
     "build:all": "npm run build:sim && npm run build:associate && npm run build:demo",
     "build:site": "npm run build:sim && npm run build:demo && npm run build -w storex && npm run build -w storex-chain && npm run build:demo -w @storewright/yard && node scripts/build-site.mjs",
+    "site": "node e2e/static-server.mjs site 4188",
     "pack:libs": "node scripts/pack-libs.mjs",
     "e2e": "playwright test",
     "e2e:browsers": "PW_ALL=1 playwright test",
@@ -52,5 +54,10 @@
     "typescript": "5.7.2",
     "typescript-eslint": "8.72.1",
     "vitest": "2.1.8"
+  },
+  "allowScripts": {
+    "esbuild@0.23.1": true,
+    "esbuild@0.21.5": true,
+    "fsevents@2.3.3": true
   }
 }

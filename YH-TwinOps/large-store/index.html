@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>YH TwinOps | 永辉大型门店数字孪生（教学概念）</title>
+  <style>
+    * {box-sizing:border-box} html,body{margin:0;width:100%;height:100%;font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:#0b1112;color:#edf4f0}
+    button, textarea {font:inherit} button{cursor:pointer} button:disabled{cursor:not-allowed;opacity:.5}
+    :root{--green:#72e2ab;--dim:#8fa8a0;--border:#263532;--panel:#121d1c}
+    .shell{height:100%;display:grid;grid-template-rows:66px minmax(0,1fr)}
+    header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #253834;background:#101918;gap:16px}
+    .brand{display:flex;align-items:center;gap:12px;white-space:nowrap} .logo{background:#c93733;color:white;border-radius:50%;width:38px;height:38px;display:grid;place-items:center;font-size:17px;font-weight:900;font-style:italic}
+    .brand strong{font-weight:750;font-size:17px;letter-spacing:.2px}.brand small{display:block;color:#819f92;font-size:10px;margin-top:3px}
+    .header-right{display:flex;gap:10px;align-items:center}.ghost,.action,.seg button{background:#182724;color:#b5cac2;border:1px solid #2a413a;border-radius:9px;padding:9px 12px;font-size:12px}.ghost:hover,.seg button:hover{background:#264039;color:#fff}
+    .pill{font-size:11px;border:1px solid #507862;color:#8febb9;padding:6px 9px;border-radius:999px;background:#1e3529}
+    .main{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:0}
+    .left{position:relative;overflow:hidden;background:radial-gradient(circle at 55% 38%,#25332f,#0b1514 64%)}
+    #viewport{position:absolute;inset:0} #viewport canvas{display:block;width:100%;height:100%}
+    .checker{background:linear-gradient(transparent 95%,rgba(255,255,255,.025) 100%),linear-gradient(90deg,transparent 95%,rgba(255,255,255,.025) 100%);background-size:38px 38px}
+    .viewer-title{position:absolute;top:20px;left:24px;pointer-events:none;max-width:55%} .eyebrow{font-size:11px;color:#8be7b4;font-weight:800;letter-spacing:1.4px}
+    .viewer-title h1{font-size:23px;margin:6px 0 5px;font-weight:800;letter-spacing:.4px}.viewer-title p{font-size:12px;color:#b2c0b9;margin:0;line-height:1.6}
+    .viewtools{position:absolute;right:22px;top:20px;display:flex;gap:5px;background:#0f1b1bbd;padding:5px;border:1px solid #345146;border-radius:12px;z-index:2}.seg button{border:0;background:transparent;padding:8px 11px}.seg button.active{background:#247b54;color:#fff}
+    #mapView{display:none;position:absolute;inset:0;padding:70px 26px 70px;align-items:center;justify-content:center;background:#0b1111ee;overflow:hidden}
+    #mapView img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;box-shadow:0 20px 65px #0008}
+    .legend{position:absolute;bottom:22px;left:22px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#0d1617d9;border:1px solid #2a413e;padding:10px 14px;border-radius:10px;font-size:11px;color:#bccdc7}
+    .colorblock{width:9px;height:9px;border-radius:2px;display:inline-block}
+    .tips{position:absolute;bottom:82px;left:24px;color:#99aba6;font-size:11px;pointer-events:none}
+    .progress{position:absolute;bottom:20px;right:20px;color:#89a398;font-size:10px}
+    .panel{display:flex;flex-direction:column;overflow:auto;background:#111b1a;border-left:1px solid #263733;scrollbar-color:#39574c transparent}
+    .section{padding:20px 22px;border-bottom:1px solid #273632}.section h2{font-size:14px;margin:0 0 14px}.section .sub{color:#8eaaa0;font-size:11px;line-height:1.6;margin:6px 0}
+    .metricgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.metric{background:#192724;border:1px solid #283f36;border-radius:10px;padding:11px}.metric b{font-size:21px;display:block;margin-bottom:4px;letter-spacing:-.5px}.metric small{color:#8ea79d;font-size:11px}
+    .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:14px}.tag{font-size:10px;color:#b3cec1;background:#1d3129;padding:6px 8px;border-radius:5px}
+    textarea{width:100%;min-height:94px;background:#0d1616;border:1px solid #30473c;border-radius:10px;color:#edf6ef;padding:12px;font-size:12px;line-height:1.7;resize:vertical;outline:none}textarea:focus{border-color:#4d996f}
+    .run{width:100%;margin-top:10px;border:1px solid #25935a;border-radius:9px;background:linear-gradient(135deg,#22834f,#17603e);padding:12px;color:#fff;font-size:13px;font-weight:750;box-shadow:0 8px 20px #08371d66}
+    .note{color:#91aa9f;font-size:11px;line-height:1.6;margin-top:10px}
+    .cards{display:grid;gap:9px}.candidate{width:100%;padding:12px;text-align:left;border:1px solid #31463f;border-radius:9px;background:#182622;color:#e3f0e8}.candidate.active{border-color:#61cb92;background:#18392b;box-shadow:inset 0 0 0 1px #257947}.candidate b{font-size:13px}.candidate .t{display:flex;justify-content:space-between;gap:12px}.candidate em{font-size:10px;color:#99f3c0;font-style:normal}.candidate small{display:block;color:#acc1b6;font-size:11px;margin-top:7px;line-height:1.6}
+    .baseline{color:#b0bcb4}.delta{color:#75e9ad}
+    .status{font-size:11px;color:#aac4b6}.boxline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0}
+    input[type=range]{accent-color:#48d68c;width:100%} .approve{background:#1b392e;border:1px solid #447b59;color:#a8ebba;padding:10px 12px;border-radius:9px;font-size:12px;width:100%}
+    .source{font-size:10px;color:#86a195;line-height:1.7}.source a{color:#9be9bc}
+    #tooltip{display:none;position:absolute;left:20px;top:120px;z-index:9;pointer-events:none;background:#0b1d19e8;border:1px solid #6ebd94;border-radius:10px;padding:12px;width:220px;box-shadow:0 18px 35px #0005}
+    #tooltip b{display:block;margin-bottom:5px}#tooltip p{margin:0;color:#b4c7bc;font-size:11px;line-height:1.6}
+    @media(max-width:950px){.main{grid-template-columns:1fr;grid-template-rows:65vh auto}.shell{height:auto;min-height:100vh}.panel{overflow:visible}.viewer-title h1{font-size:18px}.header-right .pill{display:none}.viewtools{right:10px}.brand strong{font-size:13px}}
+  </style>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+  </script>
+</head>
+<body>
+<div class="shell">
+<header>
+  <div class="brand"><div class="logo">YH</div><div><strong>永辉超市 · YH TwinOps</strong><small>DIGITAL TWIN · RETAIL LAYOUT LAB / 教学概念演示</small></div></div>
+  <div class="header-right"><span class="pill">● 合成数据 / 非官方施工图</span><button class="ghost" id="reset">重置视角</button></div>
+</header>
+<div class="main">
+ <div class="left" id="sceneShell">
+  <div class="checker" id="viewport"></div>
+  <div id="mapView"><img src="assets/floorplan.png" alt="大型门店分区重建图" /></div>
+  <div class="viewer-title"><div class="eyebrow">STORE DIGITAL TWIN · ~4,000 m²</div><h1>郑州瀚海海尚店 · 分区逻辑重建</h1><p>沿边生鲜带 / 中央蔬果岛台 / 冻品与散称 / 包装食品与百货 / 三组收银出口</p></div>
+  <div class="viewtools seg"><button class="active" id="view3d">立体</button><button id="viewTop">俯视</button><button id="viewPlan">分区图</button><button id="viewHeat">热力图</button></div>
+  <div id="tooltip"><b id="ttTitle"></b><p id="ttBody"></p></div>
+  <div class="tips">鼠标拖动旋转 · 滚轮缩放 · 点击分区查看商品陈列 · 方案切换后场景同步变化</div>
+  <div class="legend"><span class="colorblock" style="background:#69b879"></span> 蔬果 / 生鲜 <span class="colorblock" style="background:#d6a365"></span> 熟食 / 烘焙 <span class="colorblock" style="background:#7aaeda"></span> 冻品 / 水产 <span class="colorblock" style="background:#d2ae90"></span> 食品百货 <span class="colorblock" style="background:#e46b44"></span> 热点（模拟）</div>
+  <div class="progress" id="renderStatus">场景初始化中…</div>
+ </div>
+ <aside class="panel">
+  <div class="section"><h2>门店概况 <span class="status">SIMULATED</span></h2>
+   <div class="metricgrid"><div class="metric"><b>4,000 <span style="font-size:13px">㎡</span></b><small>概念营业面积</small></div><div class="metric"><b id="fixtureCount">150</b><small>陈列设备对象</small></div><div class="metric"><b>3.0 <span style="font-size:13px">m</span></b><small>主通道设计参考</small></div><div class="metric"><b>1.6 <span style="font-size:13px">m</span></b><small>中岛货架高度上限</small></div></div>
+   <div class="tags"><span class="tag">3 组收银</span><span class="tag">24 个模拟收银位</span><span class="tag">17 个业务分区</span><span class="tag">可编辑货架</span></div>
+  </div>
+  <div class="section"><h2>调改决策 Agent · MVP</h2><p class="sub">输入经营目标，系统以固定随机种子生成备选布局并比较模拟顾客路径。当前为本地确定性工具编排，不等于已接入商用大模型。</p>
+   <textarea id="goal">优化生鲜区到烘焙和包装食品区的购物路径，减轻局部拥堵，同时保持主要通道畅通。</textarea>
+   <button class="run" id="runAgent">✦ 生成并仿真 3 个布局方案</button><div class="note" id="agentInfo">就绪。先对比基线与两种可解释的调改策略。</div>
+  </div>
+  <div class="section"><h2>方案比较</h2><div id="candidates" class="cards"><div class="note">运行 Agent 后显示方案及可核算指标。</div></div><div style="height:10px"></div><button class="approve" id="approve" disabled>批准选定方案（仅写入模拟环境）</button></div>
+  <div class="section"><h2>顾客轨迹回放</h2><div class="boxline"><span class="status">仿真进度</span><span id="timeText" class="status">0%</span></div><input type="range" min="0" max="100" value="0" id="timeline" /><div class="note">当前顾客为基于合成购物篮和通道网格生成的路径；不代表真实门店客流。</div></div>
+  <div class="section"><h2>模型信息与来源</h2><p class="source">真实参考：<a href="https://www.sohu.com/a/838464583_484228" target="_blank" rel="noreferrer">《附永辉简易布局图》</a>（瀚海海尚店实地观察手绘）。<br>建筑尺寸、货架数量、虚拟顾客与实验指标均为教学假设，并非该门店测绘数据。<br>技术：Three.js / React Three Fiber 可迁移 / A* 等价网格最短路径 / 实验配对随机种子。</p></div>
+ </aside>
+</div></div>
+<script>
+  // Show the 2D reference map when the browser cannot load the Three.js module.
+  setTimeout(() => {
+    const status=document.getElementById('renderStatus');
+    if(status && status.textContent.includes('初始化中')){
+      document.getElementById('mapView').style.display='flex';
+      status.textContent='Three.js 未加载；已显示二维分区图。请检查 CDN 或改用 index.local.html';
+    }
+  },6000);
+</script>
+<script type="module" src="app.js"></script>
+</body></html>

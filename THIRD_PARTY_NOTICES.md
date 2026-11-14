@@ -16,8 +16,9 @@ Generated from the installed packages by `npm run notices` (`scripts/third-party
 | BlueOak-1.0.0 | 8 |
 | BSD-3-Clause | 5 |
 | 0BSD | 1 |
+| AGPL-3.0-only | 1 |
 | Unlicense | 1 |
-| **Total · 合计** | **207** |
+| **Total · 合计** | **208** |
 
 All of these are permissive licenses that are compatible with distributing Storewright under AGPL-3.0. · 以上都是宽松许可证，与以 AGPL-3.0 发布 Storewright 兼容。
 
@@ -781,6 +782,14 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
+
+### AGPL-3.0-only (1)
+
+#### yh-twinops@0.1.0
+
+Source · 来源: https://github.com/Glacieerr/storewright/tree/main/YH-TwinOps#readme
+
+License: AGPL-3.0-only. (no license file in the package; package.json declares AGPL-3.0-only)
 
 ### Unlicense (1)
 
