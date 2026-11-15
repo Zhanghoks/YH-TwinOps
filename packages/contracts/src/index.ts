@@ -189,7 +189,7 @@ export function parseStoreLayout(input: unknown): StoreLayout {
   return storeLayoutSchema.parse(input);
 }
 
-/** 单条 KPI 读数：投影后某分区/设施某指标的最新可用值。 */
+/** 单条 KPI 读数：投影后某分区/设施某指标的最新可用值。scope 标明口径：分区级聚合还是单个设施。 */
 export const kpiReadingSchema = z.object({
   metric: z.string().min(1),
   unit: z.string().min(1),
@@ -205,6 +205,7 @@ export const kpiReadingSchema = z.object({
   lastValue: z.number().nullable(),
   confidence: inUnitInterval.nullable(),
   coverage: inUnitInterval,
+  scope: z.enum(['zone', 'fixture']),
   evidenceIds: z.array(z.string()),
 });
 export type KpiReading = z.infer<typeof kpiReadingSchema>;

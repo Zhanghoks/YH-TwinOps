@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { METRICS, type TwinSnapshot, type TwinSignal } from '@yh/contracts';
 import { makeSignal } from '@yh/contracts/testing';
@@ -205,5 +206,38 @@ describe('runCheckoutScenario（S2 缝）', () => {
         expect(point.queueLength).toBeGreaterThanOrEqual(0);
       }
     }
+  });
+
+  it('属性：任意越界通道数都被约束校验拒绝（fast-check）', () => {
+    const snapshot = peakSnapshot(); // totalLanes = 8
+    fc.assert(
+      fc.property(fc.integer({ min: -50, max: 500 }), (lanes) => {
+        fc.pre(lanes < 1 || lanes > 8);
+        const evalResult = runCheckoutScenario(snapshot, { name: 'p', lanesOpen: lanes, extraStaff: 0, horizonMin: 30 }, 42);
+        return evalResult.ok === false;
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  it('属性：合法方案的指标全部非负且有限（fast-check）', () => {
+    const snapshot = peakSnapshot();
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 8 }),
+        fc.integer({ min: 0, max: 2 }),
+        fc.integer({ min: 10, max: 120 }),
+        fc.integer({ min: 0, max: 2 ** 31 - 1 }),
+        (lanes, staff, horizon, seed) => {
+          const evalResult = runCheckoutScenario(snapshot, { name: 'p', lanesOpen: lanes, extraStaff: staff, horizonMin: horizon }, seed);
+          if (!evalResult.ok) return false;
+          const metrics = evalResult.result.metrics;
+          const okStat = (s: { mean: number; std: number; min: number; max: number }): boolean =>
+            [s.mean, s.std, s.min, s.max].every((v) => Number.isFinite(v) && v >= 0);
+          return okStat(metrics.avgWaitMin) && okStat(metrics.p95WaitMin) && okStat(metrics.maxBacklog) && okStat(metrics.servedCount) && evalResult.result.extraStaffHours >= 0;
+        },
+      ),
+      { numRuns: 100 },
+    );
   });
 });

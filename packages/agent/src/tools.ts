@@ -15,6 +15,9 @@ import { checkoutBaseline, runCheckoutScenario, type CheckoutScenario } from '@y
  * 数据不足时如实返回 UNKNOWN，绝不补数。
  */
 
+/** Agent 默认随机种子（对比方案的"同种子"基准），避免散落的魔法数。 */
+export const DEFAULT_AGENT_SEED = 42;
+
 export interface AgentEvidence {
   signalId: string;
   metric: string;
@@ -22,6 +25,7 @@ export interface AgentEvidence {
   sourceId: string;
   kind: SignalKind;
   synthetic: boolean;
+  confidence: number | null;
 }
 
 export interface AgentToolResult {
@@ -52,6 +56,7 @@ function evidenceOf(signal: TwinSignal): AgentEvidence {
     sourceId: signal.sourceId,
     kind: signal.kind,
     synthetic: signal.synthetic,
+    confidence: signal.confidence ?? null,
   };
 }
 
@@ -66,8 +71,37 @@ function evidenceFromReading(zone: ZoneState, metric: string): AgentEvidence[] {
       sourceId: reading.sourceId,
       kind: reading.kind,
       synthetic: reading.synthetic,
+      confidence: reading.confidence,
     },
   ];
+}
+
+/** 共享的窗口聚合查询：sales/traffic 同形逻辑的唯一实现。 */
+function windowQuery(
+  deps: { signals: TwinSignal[]; asOf: string },
+  metric: string,
+  args: { windowMin: number; zoneId?: string },
+  emptyHint: string,
+): AgentToolResult {
+  const scope = args.zoneId === undefined ? {} : { zoneId: args.zoneId };
+  const { sum, evidenceIds } = sumMetricInWindow(deps.signals, metric, deps.asOf, args.windowMin, scope);
+  if (evidenceIds.length === 0) {
+    return {
+      status: 'UNKNOWN',
+      message: `窗口内没有可用的 ${metric} 观测（scope=${args.zoneId ?? '全店'}）——${emptyHint}`,
+      data: { windowMin: args.windowMin, zoneId: args.zoneId ?? null, sum: null },
+      evidence: [],
+    };
+  }
+  const byId = new Map(deps.signals.map((s) => [s.id, s]));
+  return {
+    status: 'OK',
+    data: { windowMin: args.windowMin, zoneId: args.zoneId ?? '全店', sum, sampleCount: evidenceIds.length },
+    evidence: evidenceIds.flatMap((id) => {
+      const signal = byId.get(id);
+      return signal === undefined ? [] : [evidenceOf(signal)];
+    }),
+  };
 }
 
 export interface AgentToolDeps {
@@ -81,9 +115,14 @@ export interface AgentToolDeps {
 export function createAgentTools(deps: AgentToolDeps): AgentTools {
   const { snapshot, signals } = deps;
   const runScenario = deps.runScenario ?? runCheckoutScenario;
-  const defaultSeed = deps.defaultSeed ?? 42;
+  const defaultSeed = deps.defaultSeed ?? DEFAULT_AGENT_SEED;
   const asOf = snapshot.atTime;
   const checkoutZoneId = () => Object.values(snapshot.zones).find((z) => z.zoneType === 'CHECKOUT')?.zoneId ?? '';
+  const alertsEvidence = (): AgentEvidence[] =>
+    snapshot.alerts.flatMap((a) => {
+      const zone = snapshot.zones[a.zoneId];
+      return zone === undefined ? [] : evidenceFromReading(zone, a.metric);
+    });
 
   return {
     get_store_overview: () => ({
@@ -107,10 +146,7 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
         }),
         coverage: snapshot.coverage,
       },
-      evidence: snapshot.alerts.flatMap((a) => {
-        const zone = snapshot.zones[a.zoneId];
-        return zone === undefined ? [] : evidenceFromReading(zone, a.metric);
-      }),
+      evidence: alertsEvidence(),
     }),
 
     get_zone_snapshot: ({ zoneId }) => {
@@ -141,53 +177,23 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
           coverage: zone.coverage,
           alerts: snapshot.alerts.filter((a) => a.zoneId === zoneId).map((a) => ({ alertId: a.alertId, severity: a.severity, reason: a.reason })),
         },
-        evidence: Object.values(zone.kpis).flatMap((r) => r.evidenceIds.map((id) => ({ signalId: id, metric: r.metric, observedAt: r.observedAt, sourceId: r.sourceId, kind: r.kind, synthetic: r.synthetic }))),
+        evidence: Object.values(zone.kpis).map((r) => ({
+          signalId: r.evidenceIds[0] ?? 'unattributed',
+          metric: r.metric,
+          observedAt: r.observedAt,
+          sourceId: r.sourceId,
+          kind: r.kind,
+          synthetic: r.synthetic,
+          confidence: r.confidence,
+        })),
       };
     },
 
-    query_sales: ({ windowMin, zoneId }) => {
-      const scope = zoneId === undefined ? {} : { zoneId };
-      const { sum, evidenceIds } = sumMetricInWindow(signals, METRICS.salesAmount, asOf, windowMin, scope);
-      if (evidenceIds.length === 0) {
-        return {
-          status: 'UNKNOWN',
-          message: `窗口内没有可用的 ${METRICS.salesAmount} 观测（scope=${zoneId ?? '全店'}），不能给出销售额`,
-          data: { windowMin, zoneId: zoneId ?? null, sum: null },
-          evidence: [],
-        };
-      }
-      const byId = new Map(signals.map((s) => [s.id, s]));
-      return {
-        status: 'OK',
-        data: { windowMin, zoneId: zoneId ?? '全店', sum, transactionCount: evidenceIds.length },
-        evidence: evidenceIds.flatMap((id) => {
-          const signal = byId.get(id);
-          return signal === undefined ? [] : [evidenceOf(signal)];
-        }),
-      };
-    },
+    query_sales: ({ windowMin, zoneId }) =>
+      windowQuery({ signals, asOf }, METRICS.salesAmount, { windowMin, zoneId }, '不能给出销售额'),
 
-    query_traffic: ({ windowMin, zoneId }) => {
-      const scope = zoneId === undefined ? {} : { zoneId };
-      const { sum, evidenceIds } = sumMetricInWindow(signals, METRICS.trafficCount, asOf, windowMin, scope);
-      if (evidenceIds.length === 0) {
-        return {
-          status: 'UNKNOWN',
-          message: `窗口内没有可用的 ${METRICS.trafficCount} 观测（scope=${zoneId ?? '全店'}）——可能是无传感器、信号过期或计数源离线`,
-          data: { windowMin, zoneId: zoneId ?? null, sum: null },
-          evidence: [],
-        };
-      }
-      const byId = new Map(signals.map((s) => [s.id, s]));
-      return {
-        status: 'OK',
-        data: { windowMin, zoneId: zoneId ?? '全店', sum, sampleCount: evidenceIds.length },
-        evidence: evidenceIds.flatMap((id) => {
-          const signal = byId.get(id);
-          return signal === undefined ? [] : [evidenceOf(signal)];
-        }),
-      };
-    },
+    query_traffic: ({ windowMin, zoneId }) =>
+      windowQuery({ signals, asOf }, METRICS.trafficCount, { windowMin, zoneId }, '可能是无传感器、信号过期或计数源离线'),
 
     query_operational_alerts: () => ({
       status: 'OK',
@@ -203,10 +209,7 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
         })),
         counts: snapshot.alerts.reduce<Record<string, number>>((acc, a) => ({ ...acc, [a.severity]: (acc[a.severity] ?? 0) + 1 }), {}),
       },
-      evidence: snapshot.alerts.flatMap((a) => {
-        const zone = snapshot.zones[a.zoneId];
-        return zone === undefined ? [] : evidenceFromReading(zone, a.metric);
-      }),
+      evidence: alertsEvidence(),
     }),
 
     explain_data_gap: ({ zoneId, metric }) => {
@@ -243,7 +246,12 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
         };
       }
       if (candidates.length === 0) {
-        return { status: 'OK', message: `分区 ${zoneId} 没有任何 KPI 读数，可能是无人在场且无传感器`, data: { zoneId, metric: metric ?? null, cause: 'empty-zone' }, evidence: [] };
+        return {
+          status: 'OK',
+          message: `分区 ${zoneId} 没有任何 KPI 读数——仅凭现有数据无法区分"无传感器覆盖"还是"无人在场"（两种情形的表现相同）；需要接入计数源或安排人工巡检来验证`,
+          data: { zoneId, metric: metric ?? null, cause: 'empty-zone', suggestion: '接入匿名区域计数器，或在巡检 App 上报在场人数' },
+          evidence: [],
+        };
       }
       return {
         status: 'OK',
@@ -293,9 +301,18 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
             }
           : { name: scenario.name, ok: false as const, why: evalResult.why };
       });
+      const lanesOpenAssumed = !(checkoutZone !== undefined && isDecisionUsable(checkoutZone.kpis[METRICS.checkoutLanesOpen]));
       return {
         status: results.every((r) => r.ok) ? 'OK' : 'UNKNOWN',
-        data: { snapshotId: snapshot.snapshotId, seed: seed ?? defaultSeed, scenarios: results, note: '模拟情景对比，同种子同客流假设；不是真实预测' },
+        data: {
+          snapshotId: snapshot.snapshotId,
+          seed: seed ?? defaultSeed,
+          scenarios: results,
+          lanesOpenAssumed,
+          note: lanesOpenAssumed
+            ? `模拟情景对比，同种子同客流假设；当前开放通道数无可用观测，方案 A 按通道总数 ${baselineEval.baseline.totalLanes} 假设全开（不是观测到的"现状"）；不是真实预测`
+            : '模拟情景对比，同种子同客流假设；不是真实预测',
+        },
         evidence: checkoutZone === undefined ? [] : evidenceFromReading(checkoutZone, METRICS.queueLength),
       };
     },

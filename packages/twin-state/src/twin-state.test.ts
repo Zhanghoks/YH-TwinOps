@@ -215,6 +215,36 @@ describe('projectTwinState（S1 缝）', () => {
     expect(DEFAULT_STALE_AFTER_MIN).toBe(10);
   });
 
+  it('分区级与设施级读数口径分离：设施级新信号不遮蔽分区级 KPI', () => {
+    const snapshot = projectTwinState(
+      [
+        makeSignal({ id: 'zone-q', zoneId: 'zone-checkout', metric: METRICS.queueLength, value: 10, observedAt: '2026-11-15T17:58:00Z' }),
+        makeSignal({ id: 'fix-q', zoneId: 'zone-checkout', fixtureId: 'co-01', metric: METRICS.queueLength, value: 30, observedAt: '2026-11-15T17:59:00Z' }),
+      ],
+      testLayout,
+      AT,
+    );
+    const zoneKpi = snapshot.zones['zone-checkout']?.kpis[METRICS.queueLength];
+    const fixtureKpi = snapshot.zones['zone-checkout']?.fixtures['co-01']?.kpis[METRICS.queueLength];
+    expect(zoneKpi?.value).toBe(10);
+    expect(zoneKpi?.scope).toBe('zone');
+    expect(zoneKpi?.evidenceIds).toContain('zone-q');
+    expect(fixtureKpi?.value).toBe(30);
+    expect(fixtureKpi?.scope).toBe('fixture');
+  });
+
+  it('无分区级信号时，分区 KPI 兜底取最新设施级读数并标 scope=fixture', () => {
+    const snapshot = projectTwinState(
+      [makeSignal({ id: 'fix-only', zoneId: 'zone-frozen', fixtureId: 'fz-01', metric: METRICS.equipmentOnline, unit: '布尔', value: 1, observedAt: '2026-11-15T17:59:00Z' })],
+      testLayout,
+      AT,
+    );
+    const zoneKpi = snapshot.zones['zone-frozen']?.kpis[METRICS.equipmentOnline];
+    expect(zoneKpi?.value).toBe(1);
+    expect(zoneKpi?.scope).toBe('fixture');
+    expect(zoneKpi?.evidenceIds).toContain('fix-only');
+  });
+
   it('sumMetricInWindow 只累加窗口内的可用信号', () => {
     const signals: TwinSignal[] = [
       makeSignal({ id: 'a', zoneId: 'zone-produce', metric: METRICS.salesAmount, unit: '元', value: 100, observedAt: '2026-11-15T17:50:00Z' }),

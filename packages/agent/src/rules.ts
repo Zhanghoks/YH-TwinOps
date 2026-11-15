@@ -1,4 +1,4 @@
-import type { AgentEvidence, AgentTools } from './tools';
+import { DEFAULT_AGENT_SEED, type AgentEvidence, type AgentTools } from './tools';
 
 /**
  * 本地规则解释器：无 LLM Key / 断网时的默认路径（PRD §9.1，AGENTS.md 离线约束）。
@@ -17,7 +17,18 @@ export interface AgentAnswer {
 
 function cite(evidence: AgentEvidence[]): string {
   return evidence
-    .map((e) => `${e.signalId}（${e.metric}，来源 ${e.sourceId}，${e.kind}${e.synthetic ? '，合成观测' : ''}，${e.observedAt}）`)
+    .map((e) => {
+      const parts = [
+        e.signalId,
+        e.metric,
+        `来源 ${e.sourceId}`,
+        e.kind,
+        e.synthetic ? '合成观测' : null,
+        e.observedAt,
+        e.confidence !== null ? `置信 ${e.confidence}` : null,
+      ].filter((p): p is string => p !== null);
+      return `${parts[0]}（${parts.slice(1).join('，')}）`;
+    })
     .join('；');
 }
 
@@ -46,7 +57,7 @@ export function answerLocally(question: string, tools: AgentTools): AgentAnswer 
   const wantsQueue = /(排队|拥堵|队列|瓶颈|收银)/i.test(question);
 
   if (wantsCompare) {
-    const compare = track('compare_scenarios', { seed: 42 }, tools.compare_scenarios({ seed: 42 }));
+    const compare = track('compare_scenarios', { seed: DEFAULT_AGENT_SEED }, tools.compare_scenarios({ seed: DEFAULT_AGENT_SEED }));
     if (compare.status === 'OK') {
       const scenarios = (compare.data['scenarios'] as { name: string; ok: boolean; avgWaitMin?: { mean: number }; why?: string }[]) ?? [];
       const lines = scenarios.map((s) => (s.ok ? `· ${s.name}：预测平均等待 ${s.avgWaitMin?.mean} 分钟` : `· ${s.name}：无法仿真（${s.why}）`));

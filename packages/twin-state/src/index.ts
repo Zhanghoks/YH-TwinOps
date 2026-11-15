@@ -45,7 +45,7 @@ function computeSnapshotId(storeId: string, atTime: string, signals: TwinSignal[
   return `snap-${hash.digest('hex').slice(0, 16)}`;
 }
 
-function toReading(signal: TwinSignal, atTime: string, staleAfterMin: number): KpiReading {
+function toReading(signal: TwinSignal, atTime: string, staleAfterMin: number, scope: 'zone' | 'fixture'): KpiReading {
   const freshnessMin = minutesBetween(signal.observedAt, atTime);
   const expired = signal.validUntil !== undefined && compareTime(signal.validUntil, atTime) < 0;
   const staleByAge = signal.observedAt > atTime ? false : freshnessMin > staleAfterMin;
@@ -67,6 +67,7 @@ function toReading(signal: TwinSignal, atTime: string, staleAfterMin: number): K
     lastValue: stale ? signal.value : null,
     confidence: signal.confidence ?? null,
     coverage: signal.coverage,
+    scope,
     evidenceIds: [signal.id, ...signal.evidenceIds],
   };
 }
@@ -260,17 +261,35 @@ export function projectTwinState(
       byMetric.set(signal.metric, bucket);
     }
     for (const [metric, metricSignals] of byMetric) {
-      const latest = pickLatest(metricSignals);
-      if (latest === undefined) continue;
-      const reading = toReading(latest, atTime, staleAfterMin);
-      if (latest.fixtureId !== undefined) {
-        const fixtureState = zoneState.fixtures[latest.fixtureId];
-        if (fixtureState !== undefined) {
-          fixtureState.kpis[metric] = reading;
-          continue;
+      // 口径分离：分区级信号（无 fixtureId）与设施级信号各自取最新，不互相遮蔽。
+      const zoneScope = metricSignals.filter((s) => s.fixtureId === undefined);
+      const zoneLatest = zoneScope.length > 0 ? pickLatest(zoneScope) : undefined;
+      if (zoneLatest !== undefined) {
+        zoneState.kpis[metric] = toReading(zoneLatest, atTime, staleAfterMin, 'zone');
+      }
+      const byFixture = new Map<string, TwinSignal[]>();
+      for (const signal of metricSignals) {
+        if (signal.fixtureId === undefined) continue;
+        const bucket = byFixture.get(signal.fixtureId) ?? [];
+        bucket.push(signal);
+        byFixture.set(signal.fixtureId, bucket);
+      }
+      for (const [fixtureId, fixtureSignals] of byFixture) {
+        const latest = pickLatest(fixtureSignals);
+        const fixtureState = zoneState.fixtures[fixtureId];
+        if (latest !== undefined && fixtureState !== undefined) {
+          fixtureState.kpis[metric] = toReading(latest, atTime, staleAfterMin, 'fixture');
         }
       }
-      zoneState.kpis[metric] = reading;
+      // 分区兜底：该指标没有分区级信号时，取时间上最新的设施级读数作为分区代表（scope 标 'fixture'）。
+      if (zoneState.kpis[metric] === undefined) {
+        const fixtureCandidates = Object.values(zoneState.fixtures)
+          .map((f) => f.kpis[metric])
+          .filter((r): r is KpiReading => r !== undefined)
+          .sort((a, b) => compareTime(b.observedAt, a.observedAt));
+        const representative = fixtureCandidates[0];
+        if (representative !== undefined) zoneState.kpis[metric] = representative;
+      }
     }
 
     const zoneReadings: Record<string, KpiReading> = { ...zoneState.kpis };
@@ -284,10 +303,7 @@ export function projectTwinState(
       allAlerts.push({ ...alert, raisedAt: atTime });
     }
 
-    const staleCount = zoneSignals.filter((s) => {
-      const r = toReading(s, atTime, staleAfterMin);
-      return r.stale;
-    }).length;
+    const staleCount = zoneSignals.filter((s) => toReading(s, atTime, staleAfterMin, 'zone').stale).length;
     const unknownCount = zoneSignals.filter((s) => s.kind === 'UNKNOWN').length;
     const observedAtList = zoneSignals.filter((s) => s.kind !== 'UNKNOWN').map((s) => s.observedAt);
     const lastObservedAt = observedAtList.length > 0 ? observedAtList.reduce((a, b) => (compareTime(a, b) >= 0 ? a : b)) : null;
