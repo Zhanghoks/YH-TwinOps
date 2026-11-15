@@ -177,15 +177,7 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
           coverage: zone.coverage,
           alerts: snapshot.alerts.filter((a) => a.zoneId === zoneId).map((a) => ({ alertId: a.alertId, severity: a.severity, reason: a.reason })),
         },
-        evidence: Object.values(zone.kpis).map((r) => ({
-          signalId: r.evidenceIds[0] ?? 'unattributed',
-          metric: r.metric,
-          observedAt: r.observedAt,
-          sourceId: r.sourceId,
-          kind: r.kind,
-          synthetic: r.synthetic,
-          confidence: r.confidence,
-        })),
+        evidence: Object.values(zone.kpis).flatMap((r) => evidenceFromReading(zone, r.metric)),
       };
     },
 
@@ -282,9 +274,16 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
       const checkoutZone = snapshot.zones[checkoutZoneId()];
       const lanesReading = checkoutZone?.kpis[METRICS.checkoutLanesOpen];
       const lanesOpenNow = isDecisionUsable(lanesReading) ? lanesReading.value : baselineEval.baseline.totalLanes;
+      const lanesAllOpen = lanesOpenNow >= baselineEval.baseline.totalLanes;
       const trio: CheckoutScenario[] = [
         { name: 'A 保持现状', lanesOpen: lanesOpenNow, extraStaff: 0, horizonMin: 30 },
-        { name: 'B 增开 1 条通道', lanesOpen: Math.min(lanesOpenNow + 1, baselineEval.baseline.totalLanes), extraStaff: 0, horizonMin: 30 },
+        // 通道已全开时如实说明"无法增开"，不冒充一个与 A 相同的增开方案。
+        {
+          name: lanesAllOpen ? 'B 无法增开（通道已全开）' : 'B 增开 1 条通道',
+          lanesOpen: Math.min(lanesOpenNow + 1, baselineEval.baseline.totalLanes),
+          extraStaff: 0,
+          horizonMin: 30,
+        },
         // 方案 C 带合成教学时薪，便于工作台并排比较工时成本；假设里如实登记成本口径。
         { name: 'C 调 1 人支援收银', lanesOpen: lanesOpenNow, extraStaff: 1, horizonMin: 30, staffWageCnyPerHour: TEACHING_WAGE_CNY_PER_HOUR },
       ];

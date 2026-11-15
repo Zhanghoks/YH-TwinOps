@@ -23,9 +23,12 @@ const WHITE = '#eceff1';
 const SELECTED = '#f59e0b';
 const GLASS = '#b3cfe0';
 
+/** 图层着色的视觉分档，仅影响底色；告警阈值是另一套口径（见 twin-state defaultAlertRules：队列 ≥8 警告、≥15 严重）。 */
+const QUEUE_VISUAL_BANDS = { warn: 5, critical: 12 };
+
 function queueColor(value: number): string {
-  if (value >= 12) return '#fca5a5';
-  if (value >= 5) return '#fcd34d';
+  if (value >= QUEUE_VISUAL_BANDS.critical) return '#fca5a5';
+  if (value >= QUEUE_VISUAL_BANDS.warn) return '#fcd34d';
   return '#bbf7d0';
 }
 

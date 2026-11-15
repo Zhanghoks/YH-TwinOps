@@ -116,6 +116,8 @@ export interface CheckoutBaseline {
   arrivalRatePerMin: number;
   serviceRatePerMinPerLane: number;
   initialQueueLength: number;
+  /** 初始积压是否来自观测；false 表示队列无可用读数、按 0 假设（assumptions 会如实登记）。 */
+  initialQueueObserved: boolean;
   totalLanes: number;
   availableStaff: number | null;
   /** 在岗且持收银操作资格的人数；无决策可用读数时为 null（岗位资格约束的数据来源）。 */
@@ -151,6 +153,7 @@ export function checkoutBaseline(snapshot: TwinSnapshot): { ok: true; baseline: 
       arrivalRatePerMin: arrivalsValue,
       serviceRatePerMinPerLane: serviceValue,
       initialQueueLength: isDecisionUsable(queueReading) ? queueReading.value : 0,
+      initialQueueObserved: isDecisionUsable(queueReading),
       totalLanes,
       availableStaff: isDecisionUsable(staffReading) ? Math.floor(staffReading.value) : null,
       qualifiedStaff: isDecisionUsable(qualifiedReading) ? Math.floor(qualifiedReading.value) : null,
@@ -334,6 +337,9 @@ export function runCheckoutScenario(
         arrivalRatePerMin: arrivalRate,
         serviceRatePerMinPerLane: serviceRate,
         initialQueueLength: baseline.initialQueueLength,
+        ...(baseline.initialQueueObserved
+          ? {}
+          : { initialQueueAssumed: '队列无决策可用观测，初始积压按 0 假设（不是观测值）' }),
         replications,
         /** 服务容量口径：调配人手折算为服务通道。 */
         serviceCapacity: scenario.lanesOpen + scenario.extraStaff,

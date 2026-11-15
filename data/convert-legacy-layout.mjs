@@ -34,6 +34,9 @@ const ZONE_TYPE_MAP = {
   daily: 'DAIRY',
   rest: 'STAFF',
   backroom: 'BACKROOM',
+  checkout_n: 'CHECKOUT',
+  checkout_e: 'CHECKOUT',
+  checkout_s: 'CHECKOUT',
 };
 
 /** 设施类型 → contracts FIXTURE_TYPES 与 assetId（资产库批次 001 的绑定口径）。 */
@@ -50,17 +53,21 @@ const FIXTURE_TYPE_MAP = {
   storage: { fixtureType: 'OTHER', assetId: 'yh-pallet-stack' },
 };
 
-const zones = legacy.zones.map((z) => ({
-  zoneId: `zone-${z.id}`,
-  name: z.name,
-  zoneType: ZONE_TYPE_MAP[z.id] ?? z.type?.toUpperCase() ?? 'OTHER',
-  polygonM: [
-    [z.x - z.w / 2, z.z - z.d / 2],
-    [z.x + z.w / 2, z.z - z.d / 2],
-    [z.x + z.w / 2, z.z + z.d / 2],
-    [z.x - z.w / 2, z.z + z.d / 2],
-  ],
-}));
+const zones = legacy.zones.map((z) => {
+  const zoneType = ZONE_TYPE_MAP[z.id];
+  if (zoneType === undefined) throw new Error(`未知分区 id：${z.id}（需在 ZONE_TYPE_MAP 登记）`);
+  return {
+    zoneId: `zone-${z.id}`,
+    name: z.name,
+    zoneType,
+    polygonM: [
+      [z.x - z.w / 2, z.z - z.d / 2],
+      [z.x + z.w / 2, z.z - z.d / 2],
+      [z.x + z.w / 2, z.z + z.d / 2],
+      [z.x - z.w / 2, z.z + z.d / 2],
+    ],
+  };
+});
 
 const fixtures = legacy.fixtures.map((f) => {
   const mapped = FIXTURE_TYPE_MAP[f.type];

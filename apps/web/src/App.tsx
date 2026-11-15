@@ -1,7 +1,7 @@
 /** YH 全店运营工作台（白膜演示）：场景 + 信号注入 + Agent + 三方案仿真 + 审批沙盒。 */
 import { useEffect, useMemo, useState } from 'react';
 import { projectTwinState } from '@yh/twin-state';
-import { createAgentTools } from '@yh/agent/tools';
+import { createAgentTools, DEFAULT_AGENT_SEED } from '@yh/agent/tools';
 import { SegmentedControl, SegmentedControlIndicator, SegmentedControlItem } from '@ui-sdk/react/segmented-control';
 import { INJECT_LABELS } from './synthetic';
 import { DEMO_AT, layout } from './data';
@@ -127,7 +127,7 @@ export function App(): React.JSX.Element {
             {tab === 'alerts' && <AlertsPanel snapshot={snapshot} />}
             {tab === 'agent' && <AgentPanel tools={tools} />}
             {tab === 'compare' && (
-              <ComparePanel tools={tools} snapshot={snapshot} seed={42} client={client} onProposed={() => setTab('approvals')} />
+              <ComparePanel tools={tools} snapshot={snapshot} seed={DEFAULT_AGENT_SEED} client={client} onProposed={() => setTab('approvals')} />
             )}
             {tab === 'approvals' && (
               <ApprovalsPanel client={client} refreshKey={approvalsRefresh} onRecordsChanged={() => setApprovalsRefresh((n) => n + 1)} />

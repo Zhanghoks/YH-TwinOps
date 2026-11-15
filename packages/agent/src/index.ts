@@ -5,7 +5,6 @@ export { answerLocally } from './rules';
 export type { PiAgentAnswer, PiAgentOptions, PiBackendConfig, PiCompleteFn } from './pi-adapter';
 export { AGENT_SYSTEM_PROMPT, answerWithPi, createPiComplete, piToolSpecs } from './pi-adapter';
 
-import type { Context } from '@earendil-works/pi-ai';
 import { answerLocally, type AgentAnswer } from './rules';
 import { answerWithPi, createPiComplete, type PiAgentAnswer } from './pi-adapter';
 import type { AgentTools } from './tools';
@@ -52,6 +51,3 @@ export function createAnswerEngine(tools: AgentTools, env: EngineEnv): AnswerEng
     answer: async (question: string) => answerLocally(question, tools),
   };
 }
-
-// Context 类型仅用于文档化引擎与 pi 的边界；运行时不直接引用。
-export type { Context };
