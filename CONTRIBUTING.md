@@ -41,7 +41,7 @@ npm run e2e
 ## Conventions this project follows · 本项目遵守的约定
 
 - **Match the surrounding code.** TypeScript throughout; most code comments and design documents are in Chinese. · **和周围的代码保持一致。** 全部使用 TypeScript；代码注释和设计文档大多是中文。
-- **The operations core stays pure.** `decide` returns events or a rejection code; `applyEvent` only applies events. No Chinese string literals in `packages/*` (rejections are codes, translated in the apps). · **作业核心保持纯函数。** `decide` 只返回事件或拒绝代码，`applyEvent` 只应用事件；`packages/*` 里不写中文字符串字面量（拒绝原因是代码，在应用里翻译）。
+- **The operations core stays pure.** `decide` returns events or a rejection code; `applyEvent` only applies events. No Chinese string literals in the Storewright operations packages (rejections are codes, translated in the apps); the YH-TwinOps v3 packages (`packages/contracts`, `twin-state`, `simulation`, `agent`) are Chinese-first by design ([decision 0028](docs/decisions/0028-yh-v3-foundation.md)). · **作业核心保持纯函数。** `decide` 只返回事件或拒绝代码，`applyEvent` 只应用事件；Storewright 作业核心包里不写中文字符串字面量（拒绝原因是代码，在应用里翻译）；YH-TwinOps v3 四包按[决策记录 0028](docs/decisions/0028-yh-v3-foundation.md) 以中文为第一语言。
 - **Every UI string goes through `t()`** and needs an English entry; tests fail otherwise. · **界面文字都要经过 `t()`**，并且要有英文译文，否则测试会失败。
 - **Tests come with changes.** `npm run check` must pass; UI changes keep `npm run e2e` passing (add a scenario when behavior changes). Phase 1, AI and industry reports stay reproducible unless the change is meant to alter them. · **改动要带测试。** `npm run check` 必须通过；界面改动要保持 `npm run e2e` 通过（行为变了就加场景）。除非改动本来就要改变结果，否则 Phase 1、AI 和行业报告要能逐行复现。
 - **Record decisions.** Notable design decisions go into `docs/decisions/` as a new record. · **记录决策。** 重要的设计决定写成 `docs/decisions/` 里的一条新记录。

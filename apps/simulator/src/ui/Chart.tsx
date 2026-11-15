@@ -20,7 +20,7 @@ interface Props {
   height?: number;
 }
 
-function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
+function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [w, setW] = useState(320);
   useEffect(() => {

@@ -40,7 +40,7 @@ const BUILDING_VIEWS = ['interior', 'cutaway', 'exterior'] as const;
 const DEFAULT_RATIO = 62;
 
 /** 场景与数据面板之间的分隔条：拖动调整比例，双击复位，方向键微调 */
-function Divider({ container }: { container: React.RefObject<HTMLDivElement> }) {
+function Divider({ container }: { container: React.RefObject<HTMLDivElement | null> }) {
   const ratio = useApp((s) => s.ratio);
   const fromPointer = (clientX: number) => {
     const rect = container.current?.getBoundingClientRect();

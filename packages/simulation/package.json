@@ -1,0 +1,13 @@
+{
+  "name": "@yh/simulation",
+  "version": "0.1.0",
+  "description": "YH-TwinOps v3 S2 seam: seeded discrete-event simulation of peak checkout congestion and staffing scenarios",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@yh/contracts": "0.1.0"
+  }
+}

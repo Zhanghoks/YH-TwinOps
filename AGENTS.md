@@ -18,12 +18,16 @@
 
 ### Issue tracker
 
-本地 Markdown：议题与 spec 存放在仓库 `.scratch/<feature>/` 目录，一个特性一个目录。See `docs/agents/issue-tracker.md`.
+GitHub Issues：议题与 spec 发布到 `Zhanghoks/YH-TwinOps` 的 GitHub Issues；`gh` 命令必须显式 `-R Zhanghoks/YH-TwinOps`（origin 是上游 storewright，勿发错）。`.scratch/` 仅存历史归档。See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-五个默认 triage 角色（needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix），在议题文件顶部以 `Status:` 行记录。See `docs/agents/triage-labels.md`.
+五个默认 triage 角色（needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix），以 GitHub issue label 记录。See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
 单上下文：根 `GLOSSARY.md` + `docs/adr/`，一套术语服务整个 monorepo。See `docs/agents/domain.md`.
+
+### UI SDK
+
+工作台 UI 组件用 ui-sdk（`@ui-sdk/react` + `@ui-sdk/core`，仅 apps/web；React 19 已全仓就位）。用前先读 `node_modules/@ui-sdk/react/docs/llms.txt`（安装版本自带文档），按组件页的 Composition 组装；部件无样式，按 `data-slot`/`data-checked` 上皮。自建 ui-sdk 没有的组件时再查 `docs/core.md`。skill 已装：`.agents/skills/ui-sdk`。

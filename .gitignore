@@ -42,3 +42,6 @@ StoreX-Chain/web/public/assets/fleet.glb
 YH-TwinOps/scene-map/blender.log
 YH-TwinOps/scene-map/render-done.txt
 test-results/
+
+# YH 审批沙盒的本地运行时数据（可随时删除重建）
+apps/api/data/

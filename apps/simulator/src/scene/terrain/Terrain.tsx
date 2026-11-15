@@ -106,7 +106,7 @@ function lilyGeometry(): THREE.BufferGeometry {
   return g;
 }
 
-function useInstances(ref: React.RefObject<THREE.InstancedMesh>, items: Array<{ x: number; y: number; z: number; ry: number; s: number; sy?: number; color?: THREE.Color }>): void {
+function useInstances(ref: React.RefObject<THREE.InstancedMesh | null>, items: Array<{ x: number; y: number; z: number; ry: number; s: number; sy?: number; color?: THREE.Color }>): void {
   useLayoutEffect(() => {
     const m = ref.current;
     if (!m) return;

@@ -38,7 +38,7 @@ interface Inst {
   color?: THREE.Color;
 }
 
-function useInst(ref: React.RefObject<THREE.InstancedMesh>, items: Inst[]): void {
+function useInst(ref: React.RefObject<THREE.InstancedMesh | null>, items: Inst[]): void {
   useLayoutEffect(() => {
     const m = ref.current;
     if (!m) return;

@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "policy": {
+    "aiGeneratedMarking": "所有 Tripo 生成资产必须标 aiGenerated: true 与完整来源（工具/模型/任务ID/提示词）；团队程序化生成资产标 aiGenerated: false 并登记生成脚本",
+    "approvalGate": "candidate 通过校验与视觉验收后才可置为 approved；approved 之前不得修改基线",
+    "license": "仓库内统一按 CC-BY-4.0 标注（见 REUSE.toml）；生成资产权利按 Tripo 服务条款归使用者",
+    "honesty": "校验失败候选保留 rejected 状态与原因，不静默删除；预览图与 GLB 差异如实记录"
+  },
+  "assets": [
+    {
+      "assetId": "yh-large-concept",
+      "role": "store-shell",
+      "file": "store/yh-large-concept.glb",
+      "fixtureType": "OTHER",
+      "source": {
+        "aiGenerated": false,
+        "tool": "trimesh + YH-TwinOps/large-store/export_glb.py（团队程序化生成，seed=144）",
+        "generatedAt": "2026-11-14",
+        "notes": "整店外壳模型（4516 网格，节点名前缀=设施 id F001…）：基于瀚海海尚调改逻辑的教学概念店合成布局，非真实门店测量；2026-11-14 起已随站点演示公开发布，基线已建立。用户指示工作台直接采用该模型作为白膜替代。"
+      },
+      "license": "CC-BY-4.0（仓库统一口径，见 REUSE.toml）",
+      "status": "approved"
+    },
+    {
+      "assetId": "yh-large-blockout",
+      "role": "store-shell",
+      "file": "store/yh-large-blockout.glb",
+      "fixtureType": "OTHER",
+      "source": {
+        "aiGenerated": false,
+        "tool": "trimesh + YH-TwinOps/large-store/export_glb.py --blockout（团队程序化生成，seed=144）",
+        "generatedAt": "2026-11-14",
+        "notes": "整店体块版（309 网格）：同上来源；当前未在场景中默认加载，保留作低配回退与 Blender 替换底稿。"
+      },
+      "license": "CC-BY-4.0（仓库统一口径，见 REUSE.toml）",
+      "status": "approved"
+    },
+    {
+      "assetId": "yh-gondola-shelf",
+      "fixtureType": "GONDOLA",
+      "source": {
+        "aiGenerated": true,
+        "tool": "tripo-3d（批次 001 工单 3，P1 低面数路线）",
+        "taskIds": [],
+        "notes": "GLB 尚未生成：用户按 assets/tripo/yh-gondola-shelf.md 自主生成后回传，届时补 task id 并校验。布局按 US-15 预绑定此 assetId；当前视觉由整店外壳模型（yh-large-concept）承载，Scene 只加载 approved 资产，故此条目不产生实际加载。"
+      },
+      "license": "CC-BY-4.0（生成资产按 Tripo 条款归使用者）",
+      "status": "candidate"
+    },
+    {
+      "assetId": "yh-checkout-counter",
+      "fixtureType": "CHECKOUT",
+      "source": {
+        "aiGenerated": true,
+        "tool": "tripo-3d（批次 001 工单 1，P1 低面数路线）",
+        "taskIds": [],
+        "notes": "GLB 尚未生成（同上流程）；布局与仿真测试夹具已按此 assetId 引用。"
+      },
+      "license": "CC-BY-4.0（生成资产按 Tripo 条款归使用者）",
+      "status": "candidate"
+    },
+    {
+      "assetId": "yh-freezer-upright",
+      "fixtureType": "FREEZER",
+      "source": { "aiGenerated": true, "tool": "tripo-3d（批次 001 工单 2，P1 低面数路线）", "taskIds": [], "notes": "GLB 尚未生成（同上流程）。" },
+      "license": "CC-BY-4.0（生成资产按 Tripo 条款归使用者）",
+      "status": "candidate"
+    },
+    {
+      "assetId": "yh-produce-island",
+      "fixtureType": "PRODUCE_ISLAND",
+      "source": { "aiGenerated": true, "tool": "tripo-3d（批次 001 工单 4，P1 低面数路线）", "taskIds": [], "notes": "GLB 尚未生成（同上流程）。" },
+      "license": "CC-BY-4.0（生成资产按 Tripo 条款归使用者）",
+      "status": "candidate"
+    },
+    {
+      "assetId": "yh-deli-counter",
+      "fixtureType": "DELI_COUNTER",
+      "source": { "aiGenerated": true, "tool": "tripo-3d（批次 001 工单 5，P1 低面数路线）", "taskIds": [], "notes": "GLB 尚未生成（同上流程）。" },
+      "license": "CC-BY-4.0（生成资产按 Tripo 条款归使用者）",
+      "status": "candidate"
+    },
+    {
+      "assetId": "yh-bakery-case",
+      "fixtureType": "DELI_COUNTER",
+      "source": { "aiGenerated": true, "tool": "tripo-3d（批次 001 工单 6，P1 低面数路线）", "taskIds": [], "notes": "GLB 尚未生成（同上流程）。" },
+      "license": "CC-BY-4.0（生成资产按 Tripo 条款归使用者）",
+      "status": "candidate"
+    },
+    {
+      "assetId": "yh-service-desk",
+      "fixtureType": "OTHER",
+      "source": { "aiGenerated": true, "tool": "tripo-3d（批次 001 工单 7，P1 低面数路线）", "taskIds": [], "notes": "GLB 尚未生成（同上流程）。" },
+      "license": "CC-BY-4.0（生成资产按 Tripo 条款归使用者）",
+      "status": "candidate"
+    },
+    {
+      "assetId": "yh-pallet-stack",
+      "fixtureType": "OTHER",
+      "source": { "aiGenerated": true, "tool": "tripo-3d（批次 001 工单 11，P1 低面数路线）", "taskIds": [], "notes": "GLB 尚未生成（同上流程）。" },
+      "license": "CC-BY-4.0（生成资产按 Tripo 条款归使用者）",
+      "status": "candidate"
+    }
+  ]
+}
