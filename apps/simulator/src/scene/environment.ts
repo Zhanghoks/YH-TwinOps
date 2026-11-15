@@ -166,7 +166,7 @@ export function updateEnv(timeSec: number, out: Env = env, season = 'autumn', we
  * 夜间室内照明：给店内物体的材质加一点随夜色增强的自发光，
  * 看起来像店里亮着灯（three.js 的光源不能只照亮室内，用自发光近似）。
  */
-export function useNightGlow<T extends THREE.Material & { emissive: THREE.Color }>(strength = 0.3, tint = '#fff1d6'): React.RefObject<T> {
+export function useNightGlow<T extends THREE.Material & { emissive: THREE.Color }>(strength = 0.3, tint = '#fff1d6'): React.RefObject<T | null> {
   const ref = useRef<T>(null);
   const c = useMemo(() => new THREE.Color(tint), [tint]);
   useFrame(() => {

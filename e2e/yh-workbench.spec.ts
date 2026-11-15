@@ -72,9 +72,10 @@ test('白膜工作台全链路：告警 → 助手 → 三方案 → 审批留�
   await expect(page.getByText(/已回滚/)).toBeVisible();
   await page.screenshot({ path: `${SHOT}/06-rollback.png` });
 
-  // 9. 事件注入数据隔离（US-30）：蔬果区补采后，客流图层该区从「无数据」变 176 人
+  // 9. 事件注入数据隔离（US-30）：蔬果区补采后，客流图层该区从「无数据」变 176 人；
+  //    图层切换已换成 ui-sdk SegmentedControl（radio 语义）
   await page.getByRole('button', { name: /注入蔬果区客流补采/ }).click();
-  await page.getByRole('button', { name: '客流', exact: true }).click();
+  await page.getByRole('radio', { name: '客流' }).click();
   const produceLabel = page.locator('.zone-label').filter({ hasText: 'produce' });
   await expect(produceLabel).toContainText('客流 176 人');
   await page.screenshot({ path: `${SHOT}/07-injected.png` });

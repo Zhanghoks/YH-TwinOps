@@ -35,7 +35,7 @@ interface Box {
   color: string;
 }
 
-function useBoxes(ref: React.RefObject<THREE.InstancedMesh>, items: Box[]): void {
+function useBoxes(ref: React.RefObject<THREE.InstancedMesh | null>, items: Box[]): void {
   useLayoutEffect(() => {
     const m = ref.current;
     if (!m) return;

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { projectTwinState } from '@yh/twin-state';
 import { createAgentTools } from '@yh/agent/tools';
+import { SegmentedControl, SegmentedControlIndicator, SegmentedControlItem } from '@ui-sdk/react/segmented-control';
 import { INJECT_LABELS } from './synthetic';
 import { DEMO_AT, layout } from './data';
 import { useWorkbench, type ViewLayer } from './state';
@@ -95,11 +96,15 @@ export function App(): React.JSX.Element {
       <div className="main">
         <div className="canvas-wrap">
           <div className="layer-bar">
-            {LAYERS.map((l) => (
-              <button key={l.key} className={layer === l.key ? 'layer-active' : ''} onClick={() => setLayer(l.key)}>
-                {l.label}
-              </button>
-            ))}
+            {/* 视觉图层切换：ui-sdk SegmentedControl（radio 语义，方向键可换挡） */}
+            <SegmentedControl aria-label="视觉图层" value={layer} onValueChange={(next) => setLayer((next ?? 'none') as ViewLayer)}>
+              <SegmentedControlIndicator />
+              {LAYERS.map((l) => (
+                <SegmentedControlItem key={l.key} value={l.key}>
+                  {l.label}
+                </SegmentedControlItem>
+              ))}
+            </SegmentedControl>
           </div>
           <Scene snapshot={snapshot} layout={layout} manifest={manifest} />
         </div>

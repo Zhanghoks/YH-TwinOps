@@ -27,3 +27,7 @@ GitHub Issues：议题与 spec 发布到 `Zhanghoks/YH-TwinOps` 的 GitHub Issue
 ### Domain docs
 
 单上下文：根 `GLOSSARY.md` + `docs/adr/`，一套术语服务整个 monorepo。See `docs/agents/domain.md`.
+
+### UI SDK
+
+工作台 UI 组件用 ui-sdk（`@ui-sdk/react` + `@ui-sdk/core`，仅 apps/web；React 19 已全仓就位）。用前先读 `node_modules/@ui-sdk/react/docs/llms.txt`（安装版本自带文档），按组件页的 Composition 组装；部件无样式，按 `data-slot`/`data-checked` 上皮。自建 ui-sdk 没有的组件时再查 `docs/core.md`。skill 已装：`.agents/skills/ui-sdk`。

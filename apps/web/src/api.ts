@@ -102,9 +102,9 @@ export async function createApprovalsClient(): Promise<ApprovalsClient> {
 }
 
 function apiClient(): ApprovalsClient {
-  const call = async <T>(path: string, body?: unknown): Promise<T> => {
+  const call = async <T>(path: string, body?: unknown, method?: 'GET' | 'POST'): Promise<T> => {
     const res = await fetch(path, {
-      method: body === undefined ? 'GET' : 'POST',
+      method: method ?? (body === undefined ? 'GET' : 'POST'),
       headers: body === undefined ? undefined : { 'content-type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
@@ -119,6 +119,6 @@ function apiClient(): ApprovalsClient {
     list: () => call<{ approvals: ApprovalRecord[] }>('/api/approvals').then((r) => r.approvals),
     propose: (input) => call<ApprovalRecord>('/api/approvals', input),
     decide: (planId, decision) => call<ApprovalRecord>(`/api/approvals/${planId}/decision`, { decision, decidedBy: '店长' }),
-    rollback: (planId) => call<ApprovalRecord>(`/api/approvals/${planId}/rollback`),
+    rollback: (planId) => call<ApprovalRecord>(`/api/approvals/${planId}/rollback`, undefined, 'POST'),
   };
 }

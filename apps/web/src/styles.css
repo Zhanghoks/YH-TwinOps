@@ -1,4 +1,6 @@
-/* YH 全店运营工作台（白膜演示）样式。中文界面，浅色工作台风格。 */
+/* YH 全店运营工作台样式。中文界面，浅色工作台风格。 */
+@layer ui-sdk;
+
 * {
   box-sizing: border-box;
 }
@@ -82,20 +84,45 @@ button {
   top: 10px;
   left: 10px;
   z-index: 20;
-  display: flex;
-  gap: 6px;
 }
-.layer-bar button {
+/* ui-sdk SegmentedControl：部件无样式，按 data-slot/data-checked 上皮 */
+.layer-bar [data-slot='segmented-control'] {
+  position: relative;
+  display: inline-flex;
+  isolation: isolate;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+.layer-bar [data-slot='segmented-control-indicator'] {
+  position: absolute;
+  z-index: -1;
+  top: var(--segmented-control-indicator-top);
+  left: var(--segmented-control-indicator-left);
+  width: var(--segmented-control-indicator-width);
+  height: var(--segmented-control-indicator-height);
+  background: #0f172a;
+  border-radius: 6px;
+  transition-property: top, left, width, height;
+  transition-duration: 200ms;
+}
+.layer-bar [data-slot='segmented-control-item'] {
+  border: none;
+  background: none;
   border-radius: 6px;
   padding: 5px 12px;
   font-size: 13px;
+  color: #475569;
+  cursor: pointer;
 }
-.layer-bar button.layer-active {
-  background: #0f172a;
+.layer-bar [data-slot='segmented-control-item'][data-checked] {
   color: #fff;
-  border-color: #0f172a;
+}
+.layer-bar [data-slot='segmented-control-item']:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 1px;
 }
 .sidebar {
   width: 400px;
