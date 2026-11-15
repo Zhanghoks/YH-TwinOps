@@ -2,7 +2,7 @@
   "name": "@yh/api",
   "version": "0.1.0",
   "private": true,
-  "description": "YH-TwinOps v3 approval sandbox API (teaching mock backend, no LLM, no real-system writes)",
+  "description": "YH-TwinOps v3 teaching API: approval sandbox + store agent (rules-local default, optional pi-ai)",
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@fastify/cors": "10.0.1",
+    "@yh/agent": "0.1.0",
+    "@yh/contracts": "0.1.0",
+    "@yh/twin-state": "0.1.0",
     "fastify": "5.2.0"
   }
 }

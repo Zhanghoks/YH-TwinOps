@@ -1,27 +1,16 @@
-/** YH 全店运营工作台（白膜演示）：场景 + 信号注入 + Agent + 三方案仿真 + 审批沙盒。 */
+/** YH 全店运营工作台（白膜演示）：场景 + 可调宽 Agent 对话框（对话 / 告警 / 方案 / 审批）。 */
 import { useEffect, useMemo, useState } from 'react';
 import { projectTwinState } from '@yh/twin-state';
 import { createAgentTools, DEFAULT_AGENT_SEED } from '@yh/agent/tools';
 import { SegmentedControl, SegmentedControlIndicator, SegmentedControlItem } from '@ui-sdk/react/segmented-control';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@ui-sdk/react/tooltip';
+import { Resizable, ResizableHandle, ResizablePanel } from '@ui-sdk/react/resizable';
 import { INJECT_LABELS } from './synthetic';
 import { DEMO_AT, layout } from './data';
 import { useWorkbench, type ViewLayer } from './state';
-import { createApprovalsClient, type ApprovalsClient } from './api';
+import { createApprovalsClient, fetchAgentStatus, type ApprovalsClient } from './api';
 import { Scene, type AssetManifest } from './scene/Scene';
-import { SelectionInfo } from './ui/SelectionInfo';
-import { AlertsPanel } from './ui/AlertsPanel';
-import { AgentPanel } from './ui/AgentPanel';
-import { ComparePanel } from './ui/ComparePanel';
-import { ApprovalsPanel } from './ui/ApprovalsPanel';
-
-type Tab = 'alerts' | 'agent' | 'compare' | 'approvals';
-
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'alerts', label: '告警中心' },
-  { key: 'agent', label: '门店助手' },
-  { key: 'compare', label: '方案对比' },
-  { key: 'approvals', label: '审批' },
-];
+import { AgentShell, type AgentView } from './ui/AgentShell';
 
 const LAYERS: { key: ViewLayer; label: string }[] = [
   { key: 'none', label: '白膜' },
@@ -29,6 +18,11 @@ const LAYERS: { key: ViewLayer; label: string }[] = [
   { key: 'traffic', label: '客流' },
   { key: 'coverage', label: '数据覆盖' },
 ];
+
+const INJECT_SHORT: Record<'produce-traffic' | 'checkout-arrivals', string> = {
+  'produce-traffic': '蔬果客流',
+  'checkout-arrivals': '收银到达',
+};
 
 interface RegistryFile {
   assets?: { assetId: string; file: string; status: string; role?: string }[];
@@ -62,8 +56,9 @@ export function App(): React.JSX.Element {
   const inject = useWorkbench((s) => s.inject);
   const layer = useWorkbench((s) => s.layer);
   const setLayer = useWorkbench((s) => s.setLayer);
-  const [tab, setTab] = useState<Tab>('alerts');
+  const [view, setView] = useState<AgentView>('agent');
   const [client, setClient] = useState<ApprovalsClient | null>(null);
+  const [engineLabel, setEngineLabel] = useState('探测引擎…');
   const [approvalsRefresh, setApprovalsRefresh] = useState(0);
   const manifest = useAssetManifest();
 
@@ -71,74 +66,89 @@ export function App(): React.JSX.Element {
     createApprovalsClient().then(setClient);
   }, []);
 
+  useEffect(() => {
+    void fetchAgentStatus().then((status) => {
+      if (status === null) {
+        setEngineLabel('离线规则');
+        return;
+      }
+      setEngineLabel(status.engine === 'pi-llm' ? `pi · ${status.model}` : '本地规则');
+    });
+  }, []);
+
   const snapshot = useMemo(() => projectTwinState(signals, layout, DEMO_AT), [signals]);
   const tools = useMemo(() => createAgentTools({ snapshot, signals }), [snapshot, signals]);
-  const criticalCount = snapshot.alerts.filter((a) => a.severity === 'CRITICAL').length;
 
   return (
     <div className="workbench">
       <header className="topbar">
-        <div className="topbar-title">
-          <strong>YH-TwinOps 全店运营工作台</strong>
-          <span className="tag-synthetic">合成教学演示 · 非永辉官方系统 · 无真实数据</span>
-          <span className="tag-engine">回答引擎：本地规则（离线）</span>
-          <span className="tag-time">情景时刻 {DEMO_AT.replace('T', ' ').replace('Z', '')}（18:00 高峰）</span>
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">YH</span>
+          <div className="brand-copy">
+            <strong className="brand-name">YH-TwinOps 全店运营工作台</strong>
+            <span className="brand-meta">合成教学演示 · 非永辉官方系统 · 无真实数据</span>
+          </div>
         </div>
-        <div className="topbar-actions">
-          {Object.entries(INJECT_LABELS).map(([kind, label]) => (
-            <button key={kind} className="inject" onClick={() => inject(kind as 'produce-traffic' | 'checkout-arrivals')}>
-              {label}
-            </button>
-          ))}
+
+        <div className="topbar-end">
+          <div className="topbar-status">
+            <span className="status-kicker">情景</span>
+            <span className="status-value">18:00 高峰</span>
+            <span className="status-engine">{engineLabel}</span>
+          </div>
+          <div className="topbar-actions">
+            {(Object.keys(INJECT_SHORT) as Array<keyof typeof INJECT_SHORT>).map((kind) => (
+              <Tooltip key={kind}>
+                <TooltipTrigger
+                  className="inject"
+                  aria-label={INJECT_LABELS[kind]}
+                  onClick={() => inject(kind)}
+                >
+                  {INJECT_SHORT[kind]}
+                </TooltipTrigger>
+                <TooltipContent>{INJECT_LABELS[kind]}</TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
         </div>
       </header>
 
-      <div className="main">
-        <div className="canvas-wrap">
-          <div className="layer-bar">
-            {/* 视觉图层切换：ui-sdk SegmentedControl（radio 语义，方向键可换挡） */}
-            <SegmentedControl aria-label="视觉图层" value={layer} onValueChange={(next) => setLayer((next ?? 'none') as ViewLayer)}>
-              <SegmentedControlIndicator />
-              {LAYERS.map((l) => (
-                <SegmentedControlItem key={l.key} value={l.key}>
-                  {l.label}
-                </SegmentedControlItem>
-              ))}
-            </SegmentedControl>
+      <Resizable className="main" autoSaveId="yh-workbench-split">
+        <ResizablePanel id="yh-scene" className="scene-pane" defaultSize={68} minSize={42}>
+          <div className="canvas-wrap">
+            <div className="layer-bar">
+              <SegmentedControl aria-label="视觉图层" value={layer} onValueChange={(next) => setLayer((next ?? 'none') as ViewLayer)}>
+                <SegmentedControlIndicator />
+                {LAYERS.map((l) => (
+                  <SegmentedControlItem key={l.key} value={l.key}>
+                    {l.label}
+                  </SegmentedControlItem>
+                ))}
+              </SegmentedControl>
+            </div>
+            <Scene snapshot={snapshot} layout={layout} manifest={manifest} />
           </div>
-          <Scene snapshot={snapshot} layout={layout} manifest={manifest} />
-        </div>
+        </ResizablePanel>
 
-        <aside className="sidebar">
-          <div className="selection-block">
-            <SelectionInfo snapshot={snapshot} />
-          </div>
-          <nav className="tabs">
-            {TABS.map((t) => (
-              <button key={t.key} className={tab === t.key ? 'tab-active' : ''} onClick={() => setTab(t.key)}>
-                {t.label}
-                {t.key === 'alerts' && snapshot.alerts.length > 0 && (
-                  <span className={`badge ${criticalCount > 0 ? 'badge-critical' : 'badge-warn'}`}>{snapshot.alerts.length}</span>
-                )}
-              </button>
-            ))}
-          </nav>
-          <div className="tab-body">
-            {tab === 'alerts' && <AlertsPanel snapshot={snapshot} />}
-            {tab === 'agent' && <AgentPanel tools={tools} />}
-            {tab === 'compare' && (
-              <ComparePanel tools={tools} snapshot={snapshot} seed={DEFAULT_AGENT_SEED} client={client} onProposed={() => setTab('approvals')} />
-            )}
-            {tab === 'approvals' && (
-              <ApprovalsPanel client={client} refreshKey={approvalsRefresh} onRecordsChanged={() => setApprovalsRefresh((n) => n + 1)} />
-            )}
-          </div>
-          <footer className="statusbar">
-            信号 {snapshot.coverage.totalSignals} 条（合成 {snapshot.coverage.syntheticSignals}）· 快照 {snapshot.snapshotId} · 审批沙盒：
-            {client === null ? '连接中' : client.mode === 'api' ? 'API 已连接' : '本地降级'}
-          </footer>
-        </aside>
-      </div>
+        <ResizableHandle aria-label="调整场景与 Agent 对话框宽度" className="workbench-split-handle" />
+
+        <ResizablePanel id="yh-agent" className="agent-pane" defaultSize={32} minSize={24} maxSize={48}>
+          <AgentShell
+            view={view}
+            onViewChange={setView}
+            snapshot={snapshot}
+            tools={tools}
+            signals={signals}
+            layout={layout}
+            at={DEMO_AT}
+            seed={DEFAULT_AGENT_SEED}
+            client={client}
+            approvalsRefresh={approvalsRefresh}
+            onApprovalsChanged={() => setApprovalsRefresh((n) => n + 1)}
+            onProposed={() => setView('approvals')}
+          />
+        </ResizablePanel>
+      </Resizable>
     </div>
   );
 }

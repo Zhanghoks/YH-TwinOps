@@ -19,14 +19,15 @@ test('白膜工作台全链路：告警 → 助手 → 三方案 → 审批留�
   await expect(page.locator('.zone-label').filter({ hasText: '队列 16 人' })).toBeVisible();
   await page.screenshot({ path: `${SHOT}/01-scene.png` });
 
-  // 2. 告警中心：收银队列 CRITICAL 来自规则阈值，带证据 ID
+  // 2. 告警中心（Agent 对话框内工具视图）：收银队列 CRITICAL 来自规则阈值，带证据 ID
+  await page.getByRole('tab', { name: /告警中心/ }).click();
   await expect(page.locator('.alert-card').filter({ hasText: 'CRITICAL' })).toBeVisible();
   await expect(page.getByText(/队列长度 16 达到 CRITICAL 阈值/)).toBeVisible();
   await expect(page.locator('.alert-card code').first()).toContainText('syn-');
   await page.screenshot({ path: `${SHOT}/02-alerts.png` });
 
-  // 3. 门店助手（本地规则、离线）：调 3 人被约束拒绝；调 1 人给出预测与成本
-  await page.getByRole('button', { name: '门店助手' }).click();
+  // 3. 门店助手（默认对话视图 / 服务端规则优先）：调 3 人被约束拒绝；调 1 人给出预测与成本
+  await page.getByRole('tab', { name: '门店助手' }).click();
   await page.getByRole('button', { name: /调 3 人支援收银行不行/ }).click();
   await expect(page.getByText(/无法执行/)).toBeVisible();
   await expect(page.getByText(/岗位资格/)).toBeVisible();
@@ -39,7 +40,7 @@ test('白膜工作台全链路：告警 → 助手 → 三方案 → 审批留�
   await page.screenshot({ path: `${SHOT}/03-agent.png` });
 
   // 4. 方案对比：同种子三方案；C 带成本，A/B 成本如实留空
-  await page.getByRole('button', { name: '方案对比' }).click();
+  await page.getByRole('tab', { name: '方案对比' }).click();
   await expect(page.getByText('A 保持现状')).toBeVisible();
   await expect(page.getByText('B 增开 1 条通道')).toBeVisible();
   await expect(page.getByText('C 调 1 人支援收银')).toBeVisible();
@@ -63,7 +64,7 @@ test('白膜工作台全链路：告警 → 助手 → 三方案 → 审批留�
 
   // 7. 刷新后审批记录仍在（后端文件持久化，US-41）
   await page.reload();
-  await page.getByRole('button', { name: '审批' }).click();
+  await page.getByRole('tab', { name: '审批' }).click();
   await expect(page.getByText('已批准')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/已连接审批沙盒 API/)).toBeVisible();
 

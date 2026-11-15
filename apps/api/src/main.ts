@@ -1,10 +1,11 @@
 /**
- * YH-TwinOps 审批沙盒 API（教学模拟后端）。
- * 只做三件事：审批记录的存取、店长决策、回滚。无 LLM、无真实系统写路径。
+ * YH-TwinOps 教学模拟后端：审批沙盒 + 门店助手（默认本地规则；配置 YH_AGENT_* 后走 pi-ai）。
+ * 无真实系统写路径；LLM 凭证只存在于服务端进程。
  */
 import cors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { join } from 'node:path';
+import { askAgent, getAgentStatus, parseAskBody } from './agent';
 import { createApprovalStore, type ApprovalRecord } from './approvals';
 
 const DEFAULT_PORT = 8077;
@@ -12,14 +13,39 @@ const DEFAULT_PORT = 8077;
 export interface ApiOptions {
   dataDir?: string;
   port?: number;
+  env?: NodeJS.ProcessEnv;
 }
 
 export async function buildApp(options: ApiOptions = {}): Promise<{ app: FastifyInstance; close: () => Promise<void> }> {
   const app = Fastify({ logger: false });
   await app.register(cors, { origin: true });
   const store = createApprovalStore(options.dataDir ?? join(process.cwd(), 'data'));
+  const env = options.env ?? process.env;
 
-  app.get('/api/health', async () => ({ ok: true, service: 'yh-approval-sandbox', note: '教学模拟后端：审批记录存本地文件，不触碰真实业务' }));
+  app.get('/api/health', async () => ({
+    ok: true,
+    service: 'yh-approval-sandbox',
+    agent: getAgentStatus(env).engine,
+    note: '教学模拟后端：审批沙盒 + 门店助手；不触碰真实业务',
+  }));
+
+  app.get('/api/agent/status', async () => getAgentStatus(env));
+
+  app.post<{ Body: unknown }>('/api/agent/ask', async (request, reply) => {
+    const parsed = parseAskBody(request.body);
+    if (!parsed.ok) return reply.status(400).send({ error: parsed.error });
+    try {
+      const result = await askAgent(parsed.value, env);
+      return result;
+    } catch (error) {
+      // 上游错误可能带凭证或请求 URL，只留在服务端日志。
+      console.error('门店助手后端失败', error);
+      return reply.status(502).send({
+        error: '门店助手后端失败',
+        note: '详情只在服务端日志。未配置 YH_AGENT_PROVIDER/MODEL 时走本地规则。',
+      });
+    }
+  });
 
   app.get('/api/approvals', async (): Promise<{ approvals: ApprovalRecord[] }> => ({ approvals: store.list() }));
 
@@ -71,6 +97,8 @@ export async function buildApp(options: ApiOptions = {}): Promise<{ app: Fastify
 
 // 直接运行（npm run dev / start）时启动；被测试导入时不启动。
 if (process.env.NODE_ENV !== 'test' && import.meta.url === `file://${process.argv[1] ?? ''}`) {
+  const status = getAgentStatus();
   await buildApp();
-  console.log(`审批沙盒 API 已启动：http://127.0.0.1:${DEFAULT_PORT}（教学模拟，无真实系统写路径）`);
+  console.log(`教学 API 已启动：http://127.0.0.1:${DEFAULT_PORT}（审批沙盒 + 门店助手）`);
+  console.log(`门店助手引擎：${status.engine} · ${status.model}`);
 }

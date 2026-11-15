@@ -1,7 +1,48 @@
 /**
- * 审批沙盒客户端：优先走 apps/api（服务端文件持久化）；API 不可达时降级为
- * 浏览器 localStorage 沙盒并如实标注（教学简化，刷新仍不丢）。
+ * 教学 API 客户端：审批沙盒 + 门店助手。
+ * 助手优先走 /api/agent（服务端 pi / 本地规则，凭证不进浏览器）；不可达时由面板降级。
  */
+
+import type { AgentAnswer } from '@yh/agent/rules';
+import type { PiAgentAnswer } from '@yh/agent';
+import type { StoreLayout, TwinSignal } from '@yh/contracts';
+
+export type StoreAgentAnswer = AgentAnswer | PiAgentAnswer;
+
+export interface AgentEngineStatus {
+  ok: true;
+  service: 'yh-agent';
+  engine: 'rules-local' | 'pi-llm';
+  model: string;
+  note: string;
+}
+
+export async function fetchAgentStatus(): Promise<AgentEngineStatus | null> {
+  try {
+    const res = await fetch('/api/agent/status', { signal: AbortSignal.timeout(1500) });
+    if (!res.ok) return null;
+    return (await res.json()) as AgentEngineStatus;
+  } catch {
+    return null;
+  }
+}
+
+export async function askStoreAgent(input: {
+  question: string;
+  at: string;
+  layout: StoreLayout;
+  signals: TwinSignal[];
+}): Promise<StoreAgentAnswer> {
+  const res = await fetch('/api/agent/ask', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    throw new Error(`门店助手 API ${res.status}`);
+  }
+  return (await res.json()) as StoreAgentAnswer;
+}
 
 export interface ApprovalRecord {
   planId: string;
