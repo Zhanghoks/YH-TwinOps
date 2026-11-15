@@ -310,6 +310,8 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
           snapshotId: snapshot.snapshotId,
           seed: seed ?? defaultSeed,
           scenarios: results,
+          /** 当前开放通道数（观测可用时为观测值，否则按通道总数假设）——供规则解释器构造调人方案。 */
+          lanesOpenNow,
           lanesOpenAssumed,
           note: lanesOpenAssumed
             ? `模拟情景对比，同种子同客流假设；当前开放通道数无可用观测，方案 A 按通道总数 ${baselineEval.baseline.totalLanes} 假设全开（不是观测到的"现状"）；不是真实预测`

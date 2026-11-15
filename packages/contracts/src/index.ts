@@ -107,6 +107,8 @@ export const ZONE_TYPES = [
   'BEVERAGE',
   'GROCERY',
   'SNACKS',
+  /** 特色主题陈列区（教学概念店原始布局中的 featured 展示位）。 */
+  'FEATURED',
   'HOUSEHOLD',
   'CHECKOUT',
   'SERVICE',

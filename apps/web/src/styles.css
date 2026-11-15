@@ -1,0 +1,482 @@
+/* YH 全店运营工作台（白膜演示）样式。中文界面，浅色工作台风格。 */
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  color: #1e293b;
+}
+.workbench {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: #0f172a;
+  color: #f8fafc;
+  flex-wrap: wrap;
+}
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.tag-synthetic {
+  background: #7c2d12;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.tag-engine,
+.tag-time {
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+}
+.inject {
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.inject:hover {
+  background: #2563eb;
+}
+.main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.canvas-wrap {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+.layer-bar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 20;
+  display: flex;
+  gap: 6px;
+}
+.layer-bar button {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+}
+.layer-bar button.layer-active {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+.sidebar {
+  width: 400px;
+  border-left: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  min-height: 0;
+}
+.selection-block {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  max-height: 42%;
+  overflow: auto;
+}
+.tabs {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tabs button {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 9px 4px;
+  font-size: 13px;
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.tabs button.tab-active {
+  border-bottom-color: #1d4ed8;
+  font-weight: 600;
+}
+.badge {
+  border-radius: 9px;
+  font-size: 11px;
+  padding: 1px 7px;
+  color: #fff;
+}
+.badge-critical {
+  background: #dc2626;
+}
+.badge-warn {
+  background: #d97706;
+}
+.tab-body {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 12px;
+}
+.statusbar {
+  border-top: 1px solid #e2e8f0;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.panel-note,
+.muted {
+  color: #64748b;
+  font-size: 12px;
+}
+.panel-note strong {
+  color: #334155;
+}
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.preset {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 12px;
+  text-align: left;
+}
+.preset:hover {
+  background: #e2e8f0;
+}
+form {
+  display: flex;
+  gap: 6px;
+}
+.agent-input {
+  flex: 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 13px;
+}
+.primary {
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.primary:hover {
+  background: #2563eb;
+}
+.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.link {
+  background: none;
+  border: none;
+  color: #1d4ed8;
+  padding: 0;
+  font-size: 12px;
+  text-decoration: underline;
+}
+.answer {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+}
+.answer-text {
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+.cannot-judge {
+  margin-top: 8px;
+  background: #fefce8;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.cannot-judge ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.tool-calls {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+.evidence-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.evidence-chip {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.scenario-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scenario-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.scenario-rejected {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.scenario-title {
+  font-weight: 700;
+}
+.approval-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+.status-approved {
+  border-left: 4px solid #16a34a;
+}
+.status-pending {
+  border-left: 4px solid #d97706;
+}
+.status-rejected {
+  border-left: 4px solid #94a3b8;
+}
+.approval-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.approval-actions {
+  display: flex;
+  gap: 8px;
+}
+.task-sheet {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+.task-sheet ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.chip {
+  border-radius: 8px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.chip-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.chip-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+.chip-rejected {
+  background: #f1f5f9;
+  color: #475569;
+}
+.chip-critical,
+.severity-critical {
+  background: #dc2626;
+  color: #fff;
+}
+.chip-warning,
+.severity-warning {
+  background: #f59e0b;
+  color: #fff;
+}
+.chip-info,
+.severity-info {
+  background: #3b82f6;
+  color: #fff;
+}
+.chip-unknown,
+.severity-unknown {
+  background: #64748b;
+  color: #fff;
+}
+.kind-observed {
+  background: #dcfce7;
+  color: #166534;
+}
+.kind-estimated {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.kind-simulated {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+.kind-unknown,
+.kind-stale {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px dashed #94a3b8;
+}
+.alert-card {
+  border: 1px solid #e2e8f0;
+  border-left-width: 4px;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+.severity-critical .chip {
+  background: #dc2626;
+}
+.alert-card {
+  border-left-color: #94a3b8;
+}
+.alert-card:has(.severity-critical) {
+  border-left-color: #dc2626;
+}
+.alert-card:has(.severity-warning) {
+  border-left-color: #f59e0b;
+}
+.alert-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.alert-box {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #b91c1c;
+}
+.ok-box {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #166534;
+}
+.warn-box {
+  background: #fefce8;
+  border: 1px solid #fde047;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #854d0e;
+}
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 12px;
+  font-size: 12px;
+}
+.kv span:nth-child(odd) {
+  color: #64748b;
+}
+.kpi-row {
+  font-size: 12px;
+  line-height: 1.7;
+}
+h4 {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #475569;
+}
+.zone-label {
+  background: rgba(15, 23, 42, 0.78);
+  color: #f8fafc;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transform: translateY(-4px);
+}
+.zone-label span {
+  font-size: 11px;
+  opacity: 0.9;
+}
+.store-caption {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: #475569;
+}
+code {
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+}

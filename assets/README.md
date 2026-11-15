@@ -9,6 +9,7 @@
 assets/
 ├── README.md          本规范
 ├── registry.json      资产登记台账（唯一事实源）
+├── store/             团队程序化生成的整店外壳模型（store-shell，非 AI 生成）
 └── tripo/             Tripo 3D 生成的 GLB 资产 + 批次总纲（batch-*-README.md）与每资产工单（<assetId>.md）
 ```
 

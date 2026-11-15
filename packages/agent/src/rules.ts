@@ -1,3 +1,4 @@
+import { TEACHING_WAGE_CNY_PER_HOUR, type CheckoutScenario } from '@yh/simulation';
 import { DEFAULT_AGENT_SEED, type AgentEvidence, type AgentTools } from './tools';
 
 /**
@@ -75,6 +76,54 @@ export function answerLocally(question: string, tools: AgentTools): AgentAnswer 
       };
     }
     cannotJudge.push(compare.message ?? '仿真基线缺失');
+  }
+
+  // 「调 N 人支援收银」：单方案 what-if（含岗位资格/成本约束校验，拒绝也如实回答）。
+  const simMatch = /调\s*(\d+)\s*人/.exec(question);
+  if (simMatch !== null) {
+    const extra = Math.max(1, Math.min(9, Number.parseInt(simMatch[1] ?? '1', 10)));
+    const compare = track('compare_scenarios', { seed: DEFAULT_AGENT_SEED }, tools.compare_scenarios({ seed: DEFAULT_AGENT_SEED }));
+    const lanesOpenNow = Number(compare.data['lanesOpenNow'] ?? 4);
+    const scenario: CheckoutScenario = {
+      name: `调 ${extra} 人支援收银`,
+      lanesOpen: lanesOpenNow,
+      extraStaff: extra,
+      horizonMin: 30,
+      staffWageCnyPerHour: TEACHING_WAGE_CNY_PER_HOUR,
+    };
+    const sim = track('simulate_intervention', { scenario }, tools.simulate_intervention({ scenario }));
+    if (sim.status === 'OK') {
+      const result = sim.data['scenario'] as {
+        metrics: { avgWaitMin: { mean: number }; p95WaitMin: { mean: number }; maxBacklog: { mean: number } };
+        extraStaffHours: number;
+        extraCostCny: number | null;
+        assumptions: Record<string, unknown>;
+      };
+      return {
+        answer: [
+          `【模拟情景】${scenario.name}（开放 ${lanesOpenNow} 条通道 + ${extra} 名调配人手，30 分钟窗口）：`,
+          `· 预测平均等待 ${result.metrics.avgWaitMin.mean} 分钟，P95 ${result.metrics.p95WaitMin.mean} 分钟，最大积压 ${result.metrics.maxBacklog.mean} 人`,
+          `· 调人工时 ${result.extraStaffHours} 小时${result.extraCostCny !== null ? `，成本约 ${result.extraCostCny} 元（${String(result.assumptions['costBasis'])}）` : '（未提供时薪假设，成本未核算）'}`,
+          `假设与模型版本见 assumptions；这是模拟情景，不是真实预测。${evidence.length > 0 ? `证据：${cite(evidence)}` : ''}`,
+          '如需落地请到「方案对比」页送店长审批（审批由人触发）。',
+        ].join('\n'),
+        mode: 'rules-local',
+        toolCalls,
+        evidence,
+        cannotJudge,
+      };
+    }
+    return {
+      answer: [
+        `【模拟情景】${scenario.name} 无法执行：${sim.message ?? '约束校验未通过'}`,
+        '如需放开该方案，请先补齐对应信号（岗位资格/员工在岗），或调整方案参数后再试。',
+        `${evidence.length > 0 ? `证据：${cite(evidence)}` : ''}`,
+      ].join('\n'),
+      mode: 'rules-local',
+      toolCalls,
+      evidence,
+      cannotJudge,
+    };
   }
 
   if (wantsGap) {

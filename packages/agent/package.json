@@ -5,7 +5,9 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./tools": "./src/tools.ts",
+    "./rules": "./src/rules.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^1.5.2",

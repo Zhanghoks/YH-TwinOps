@@ -256,3 +256,14 @@ describe('projectTwinState（S1 缝）', () => {
     expect(evidenceIds).toEqual(['a', 'b']);
   });
 });
+
+describe('sha256Hex（纯 TS 实现，浏览器可用）', () => {
+  it('与标准 sha256 摘要一致（FIPS 180-4 已知向量）', async () => {
+    const { sha256Hex } = await import('./index');
+    expect(sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(sha256Hex('')).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+    // 中文（多字节 UTF-8）路径
+    // node -e "console.log(require('crypto').createHash('sha256').update('永辉').digest('hex'))"
+    expect(sha256Hex('永辉')).toBe('3607e7ba119997eb6dca463ce6538e169b22c78d5ab8b3d788bd3335d545ec62');
+  });
+});

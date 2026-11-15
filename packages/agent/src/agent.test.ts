@@ -183,6 +183,25 @@ describe('本地规则解释器（默认离线路径）', () => {
     expect(answer.toolCalls.some((c) => c.tool === 'get_store_overview')).toBe(true);
   });
 
+  it('“调 3 人支援收银”触发单方案仿真；超过可用员工数时如实拒绝', () => {
+    const { tools } = makeTools(); // 夹具在岗 2 人、持资格 2 人：3 人先撞员工数约束
+    const answer = answerLocally('调 3 人支援收银可以吗？', tools);
+    expect(answer.mode).toBe('rules-local');
+    expect(answer.toolCalls.some((c) => c.tool === 'simulate_intervention')).toBe(true);
+    expect(answer.answer).toMatch(/无法执行/);
+    expect(answer.answer).toMatch(/超过可用员工数 2/);
+    expect(answer.answer).toMatch(/补齐对应信号|调整方案参数/);
+  });
+
+  it('“调 1 人支援收银”在资格内时给出预测指标与成本口径', () => {
+    const { tools } = makeTools();
+    const answer = answerLocally('调 1 人支援收银可以吗？', tools);
+    expect(answer.toolCalls.some((c) => c.tool === 'simulate_intervention')).toBe(true);
+    expect(answer.answer).toMatch(/预测平均等待/);
+    expect(answer.answer).toMatch(/成本约 12\.5 元/);
+    expect(answer.answer).toMatch(/合成教学时薪假设/);
+  });
+
   it('“为什么没数据”解释数据盲区（AT-03）', () => {
     const { tools } = makeTools(blindSpotSignals());
     const answer = answerLocally('zone-produce 这个区域为什么没数据？是没有人在还是传感器离线？', tools);
