@@ -9,7 +9,7 @@
 assets/
 ├── README.md          本规范
 ├── registry.json      资产登记台账（唯一事实源）
-└── tripo/             Tripo 3D 生成的 GLB 资产 + 批次生成工单（batch-*-design.md）
+└── tripo/             Tripo 3D 生成的 GLB 资产 + 批次总纲（batch-*-README.md）与每资产工单（<assetId>.md）
 ```
 
 ## 登记规范（强制）
@@ -32,7 +32,7 @@ assets/
 3. 生成完成后校验：面数预算、包围盒尺寸与 `fixtureType` 常识一致、无品牌标识
 4. 下载到 `assets/tripo/`、登记为 `candidate`，视觉验收通过后置为 `approved`
 5. 结果 URL 约 5 分钟过期；以本地文件与登记台账为准
-6. 批次 001（12 个门店设施）生成工单见 `assets/tripo/batch-001-design.md`：提示词可直接复制，回传 task_id 或 GLB 文件后由代理校验登记
+6. 批次 001（12 个门店设施）总纲见 `assets/tripo/batch-001-README.md`，每资产独立工单 `assets/tripo/<assetId>.md`：提示词可直接复制，回传 task_id 或 GLB 文件后由代理校验登记
 
 ## 诚实性
 
