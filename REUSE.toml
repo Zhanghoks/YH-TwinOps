@@ -90,3 +90,13 @@ path = [
 ]
 SPDX-FileCopyrightText = "2026 Glacieerr"
 SPDX-License-Identifier = "CC-BY-4.0"
+
+# YH-TwinOps v3 foundation: new packages (packages/contracts, twin-state, simulation, agent) are YH-new code
+# under the Part 1 general rule (AGPL-3.0-only via root LICENSE). The shared assets/ tree holds
+# AI-generated (Tripo 3D) and synthetic teaching assets: CC BY 4.0, matching how generated assets are annotated.
+# v3 基础新增的四个包属 YH 新增代码，按第一部分通用规则（AGPL-3.0-only，见根 LICENSE）。
+# assets/ 共享资产库存放 AI 生成（Tripo 3D）与合成教学资产：CC BY 4.0，与既有生成资产标注方式一致。
+[[annotations]]
+path = "assets/**"
+SPDX-FileCopyrightText = "2026 Zhanghoks"
+SPDX-License-Identifier = "CC-BY-4.0"

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "policy": {
+    "aiGeneratedMarking": "所有 Tripo 生成资产必须标 aiGenerated: true 与完整来源（工具/模型/任务ID/提示词）",
+    "approvalGate": "candidate 通过校验与视觉验收后才可置为 approved；approved 之前不得修改基线",
+    "license": "仓库内统一按 CC-BY-4.0 标注（见 REUSE.toml）；生成资产权利按 Tripo 服务条款归使用者",
+    "honesty": "校验失败候选保留 rejected 状态与原因，不静默删除；预览图与 GLB 差异如实记录"
+  },
+  "assets": []
+}

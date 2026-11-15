@@ -1,0 +1,16 @@
+{
+  "name": "@yh/agent",
+  "version": "0.1.0",
+  "description": "YH-TwinOps v3 S3 seam: provenance-disciplined store agent tools with local rule interpreter and optional pi-ai LLM backend",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "^1.5.2",
+    "@yh/contracts": "0.1.0",
+    "@yh/simulation": "0.1.0",
+    "@yh/twin-state": "0.1.0"
+  }
+}

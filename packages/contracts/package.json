@@ -1,0 +1,14 @@
+{
+  "name": "@yh/contracts",
+  "version": "0.1.0",
+  "description": "YH-TwinOps v3 shared contracts: TwinSignal provenance schema, store layout and twin snapshot types",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "dependencies": {
+    "zod": "3.23.8"
+  }
+}
