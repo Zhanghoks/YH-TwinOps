@@ -9,7 +9,7 @@
 assets/
 ├── README.md          本规范
 ├── registry.json      资产登记台账（唯一事实源）
-└── tripo/             Tripo 3D 生成的 GLB 资产
+└── tripo/             Tripo 3D 生成的 GLB 资产 + 批次生成工单（batch-*-design.md）
 ```
 
 ## 登记规范（强制）
@@ -27,11 +27,12 @@ assets/
 
 ## Tripo 生成流程
 
-1. `tripo_plan` 先出计费链路草稿，确认额度后再生成
-2. 低面数路线：`face_limit ≤ 20000`（自动选 P1 模型），Three.js/WebGL 直接用 GLB
+1. 计费生成前先出链路草稿并确认额度（`tripo_plan` 或批次工单）
+2. 低面数路线：`face_limit ≤ 20000`（P1 模型），Three.js/WebGL 直接用 GLB
 3. 生成完成后校验：面数预算、包围盒尺寸与 `fixtureType` 常识一致、无品牌标识
 4. 下载到 `assets/tripo/`、登记为 `candidate`，视觉验收通过后置为 `approved`
 5. 结果 URL 约 5 分钟过期；以本地文件与登记台账为准
+6. 批次 001（12 个门店设施）生成工单见 `assets/tripo/batch-001-design.md`：提示词可直接复制，回传 task_id 或 GLB 文件后由代理校验登记
 
 ## 诚实性
 
