@@ -8,6 +8,11 @@ import { METRICS, isDecisionUsable, type TwinSnapshot } from '@yh/contracts';
 
 export const SIM_MODEL_VERSION = 'yh-checkout-des-0.1';
 export const DEFAULT_REPLICATIONS = 5;
+/**
+ * 合成教学时薪假设（元/小时），用于把调人工时换算成成本。
+ * 这是明确标记的教学假设，不是任何真实门店的薪酬数据。
+ */
+export const TEACHING_WAGE_CNY_PER_HOUR = 25;
 
 export interface CheckoutScenario {
   name: string;
@@ -23,6 +28,13 @@ export interface CheckoutScenario {
   arrivalRatePerMin?: number;
   /** 覆盖单通道服务率（人/分钟）；缺省时从快照读数取。 */
   serviceRatePerMinPerLane?: number;
+  /**
+   * 调入人员的时薪（元/小时）——合成教学假设；提供后核算 extraCostCny。
+   * 不提供时只报工时、成本如实留空（不编造成本数字）。
+   */
+  staffWageCnyPerHour?: number;
+  /** 调人成本预算上限（元）；设置后成本超预算的方案被拒绝（成本约束，AT-05）。 */
+  maxExtraCostCny?: number;
 }
 
 export interface ScenarioStat {
@@ -50,6 +62,8 @@ export interface ScenarioResult {
   /** 一次代表性复制（种子 = seed）的逐分钟队列长度，供时间线展示。 */
   queueTimeline: { tMin: number; queueLength: number }[];
   extraStaffHours: number;
+  /** 调人成本（元）＝ extraStaffHours × 时薪；未提供时薪假设时为 null（不编造）。 */
+  extraCostCny: number | null;
   laneChangeCount: number;
 }
 
@@ -104,6 +118,8 @@ export interface CheckoutBaseline {
   initialQueueLength: number;
   totalLanes: number;
   availableStaff: number | null;
+  /** 在岗且持收银操作资格的人数；无决策可用读数时为 null（岗位资格约束的数据来源）。 */
+  qualifiedStaff: number | null;
 }
 
 /** 从快照推导仿真基线；缺少决策可用读数时如实报告缺失项。 */
@@ -127,6 +143,7 @@ export function checkoutBaseline(snapshot: TwinSnapshot): { ok: true; baseline: 
   if (missing.length > 0 || arrivalsValue === null || serviceValue === null) return { ok: false, missing };
 
   const staffReading = checkoutZone.kpis[METRICS.staffCount];
+  const qualifiedReading = checkoutZone.kpis[METRICS.checkoutQualifiedStaff];
   const queueReading = checkoutZone.kpis[METRICS.queueLength];
   return {
     ok: true,
@@ -136,6 +153,7 @@ export function checkoutBaseline(snapshot: TwinSnapshot): { ok: true; baseline: 
       initialQueueLength: isDecisionUsable(queueReading) ? queueReading.value : 0,
       totalLanes,
       availableStaff: isDecisionUsable(staffReading) ? Math.floor(staffReading.value) : null,
+      qualifiedStaff: isDecisionUsable(qualifiedReading) ? Math.floor(qualifiedReading.value) : null,
     },
   };
 }
@@ -231,6 +249,15 @@ export function runCheckoutScenario(
   if (scenario.serviceRatePerMinPerLane !== undefined && scenario.serviceRatePerMinPerLane <= 0) {
     return { ok: false, why: 'serviceRatePerMinPerLane 必须 > 0' };
   }
+  if (scenario.staffWageCnyPerHour !== undefined && scenario.staffWageCnyPerHour < 0) {
+    return { ok: false, why: 'staffWageCnyPerHour 必须 ≥ 0' };
+  }
+  if (scenario.maxExtraCostCny !== undefined && scenario.maxExtraCostCny < 0) {
+    return { ok: false, why: 'maxExtraCostCny 必须 ≥ 0' };
+  }
+  if (scenario.maxExtraCostCny !== undefined && scenario.staffWageCnyPerHour === undefined) {
+    return { ok: false, why: '设置了成本预算但未提供时薪假设（staffWageCnyPerHour），无法核算成本；请提供时薪或取消预算，不能编造成本' };
+  }
 
   const baselineEval = checkoutBaseline(snapshot);
   if (!baselineEval.ok) {
@@ -247,6 +274,28 @@ export function runCheckoutScenario(
     if (scenario.extraStaff > baseline.availableStaff) {
       return { ok: false, why: `extraStaff=${scenario.extraStaff} 超过可用员工数 ${baseline.availableStaff}` };
     }
+    if (baseline.qualifiedStaff === null) {
+      return {
+        ok: false,
+        why: 'checkout_qualified_staff_count（持收银资格的在岗人数）无可用观测（UNKNOWN），无法验证岗位资格约束；请补采员工资格信号或将 extraStaff 设为 0',
+      };
+    }
+    if (scenario.extraStaff > baseline.qualifiedStaff) {
+      return {
+        ok: false,
+        why: `extraStaff=${scenario.extraStaff} 超过持收银资格的在岗人数 ${baseline.qualifiedStaff}（岗位资格约束：支援收银必须持收银操作资格）`,
+      };
+    }
+  }
+
+  // 成本核算只依赖方案字段（工时 × 时薪），与仿真抽样无关；超预算在跑复制前就拒绝。
+  const extraStaffHoursRaw = (scenario.extraStaff * scenario.horizonMin) / 60;
+  const extraCostCny = scenario.staffWageCnyPerHour === undefined ? null : round2(extraStaffHoursRaw * scenario.staffWageCnyPerHour);
+  if (scenario.maxExtraCostCny !== undefined && extraCostCny !== null && extraCostCny > scenario.maxExtraCostCny) {
+    return {
+      ok: false,
+      why: `调人成本 ${extraCostCny} 元（${scenario.extraStaff} 人 × ${scenario.horizonMin} 分钟 × ${scenario.staffWageCnyPerHour} 元/时）超过预算 ${scenario.maxExtraCostCny} 元（成本约束）`,
+    };
   }
 
   const arrivalRate = scenario.arrivalRatePerMin ?? baseline.arrivalRatePerMin;
@@ -260,7 +309,8 @@ export function runCheckoutScenario(
   let representativeTimeline: { tMin: number; queueLength: number }[] = [];
   for (let i = 0; i < replications; i += 1) {
     const rng = mulberry32((seed + i) >>> 0);
-    const run = replicateOnce(rng, { ...baseline, arrivalRatePerMin: arrivalRate, serviceRatePerMinPerLane: serviceRate }, scenario.lanesOpen, scenario.horizonMin);
+    // 服务容量 = 开放通道 + 调配人手（每 1 人相当于增开 1 条服务通道）。
+    const run = replicateOnce(rng, { ...baseline, arrivalRatePerMin: arrivalRate, serviceRatePerMinPerLane: serviceRate }, scenario.lanesOpen + scenario.extraStaff, scenario.horizonMin);
     avgWaits.push(run.avgWaitMin);
     p95Waits.push(run.p95WaitMin);
     backlogs.push(run.maxBacklog);
@@ -285,6 +335,15 @@ export function runCheckoutScenario(
         serviceRatePerMinPerLane: serviceRate,
         initialQueueLength: baseline.initialQueueLength,
         replications,
+        /** 服务容量口径：调配人手折算为服务通道。 */
+        serviceCapacity: scenario.lanesOpen + scenario.extraStaff,
+        ...(scenario.extraStaff > 0 && baseline.qualifiedStaff !== null
+          ? { qualifiedStaffAvailable: baseline.qualifiedStaff, staffQualification: '支援收银必须持收银操作资格' }
+          : {}),
+        ...(scenario.staffWageCnyPerHour !== undefined
+          ? { staffWageCnyPerHour: scenario.staffWageCnyPerHour, costBasis: '合成教学时薪假设，非真实薪酬数据' }
+          : {}),
+        ...(scenario.maxExtraCostCny !== undefined ? { maxExtraCostCny: scenario.maxExtraCostCny } : {}),
         note: '模拟情景结果，不是真实门店的预测；仅在假设成立时成立',
       },
       metrics: {
@@ -294,7 +353,8 @@ export function runCheckoutScenario(
         servedCount: stat(serveds),
       },
       queueTimeline: representativeTimeline,
-      extraStaffHours: round2((scenario.extraStaff * scenario.horizonMin) / 60),
+      extraStaffHours: round2(extraStaffHoursRaw),
+      extraCostCny,
       laneChangeCount: Math.abs(scenario.lanesOpen - baselineLanes) + scenario.extraStaff,
     },
   };

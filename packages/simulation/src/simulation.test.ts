@@ -49,7 +49,7 @@ const testLayout = {
   ],
 };
 
-/** 构造带完整仿真基线的快照：到达率 / 服务率 / 初始队列 / 在岗员工。 */
+/** 构造带完整仿真基线的快照：到达率 / 服务率 / 初始队列 / 在岗员工 / 持收银资格人数。 */
 function peakSnapshot(signals: TwinSignal[] = []): TwinSnapshot {
   return projectTwinState(
     [
@@ -57,6 +57,7 @@ function peakSnapshot(signals: TwinSignal[] = []): TwinSnapshot {
       makeSignal({ id: 'svc1', zoneId: 'zone-checkout', metric: METRICS.checkoutServiceRate, unit: '人/分钟/通道', value: 2.5, observedAt: '2026-11-15T17:59:00Z' }),
       makeSignal({ id: 'q1', zoneId: 'zone-checkout', metric: METRICS.queueLength, unit: '人', value: 5, observedAt: '2026-11-15T17:59:00Z' }),
       makeSignal({ id: 'staff1', zoneId: 'zone-checkout', metric: METRICS.staffCount, unit: '人', value: 2, observedAt: '2026-11-15T17:59:00Z' }),
+      makeSignal({ id: 'qual1', zoneId: 'zone-checkout', metric: METRICS.checkoutQualifiedStaff, unit: '人', value: 2, observedAt: '2026-11-15T17:59:00Z' }),
       ...signals,
     ],
     testLayout,
@@ -123,11 +124,139 @@ describe('runCheckoutScenario（S2 缝）', () => {
     }
   });
 
+  it('提供时薪假设时核算成本并注明合成口径', () => {
+    const snapshot = peakSnapshot();
+    const evalResult = runCheckoutScenario(
+      snapshot,
+      { name: '调 1 人支援', lanesOpen: 4, extraStaff: 1, horizonMin: 30, staffWageCnyPerHour: 25 },
+      42,
+    );
+    expect(evalResult.ok).toBe(true);
+    if (evalResult.ok) {
+      expect(evalResult.result.extraCostCny).toBe(12.5);
+      expect(evalResult.result.assumptions['staffWageCnyPerHour']).toBe(25);
+      expect(evalResult.result.assumptions['costBasis']).toMatch(/合成教学时薪假设/);
+    }
+  });
+
+  it('未提供时薪时成本如实留空（不编造成本数字）', () => {
+    const snapshot = peakSnapshot();
+    const evalResult = runCheckoutScenario(snapshot, { name: '调 1 人支援', lanesOpen: 4, extraStaff: 1, horizonMin: 30 }, 42);
+    expect(evalResult.ok).toBe(true);
+    if (evalResult.ok) {
+      expect(evalResult.result.extraCostCny).toBeNull();
+      expect(evalResult.result.assumptions['costBasis']).toBeUndefined();
+    }
+  });
+
+  it('成本超预算的方案被拒绝；恰好等于预算时放行（成本约束，AT-05）', () => {
+    const snapshot = peakSnapshot(); // 1 人 × 30 分钟 × 25 元/时 = 12.5 元
+    const over = runCheckoutScenario(
+      snapshot,
+      { name: 'x', lanesOpen: 4, extraStaff: 1, horizonMin: 30, staffWageCnyPerHour: 25, maxExtraCostCny: 10 },
+      42,
+    );
+    expect(over.ok).toBe(false);
+    if (!over.ok) {
+      expect(over.why).toMatch(/超过预算 10 元/);
+      expect(over.why).toMatch(/成本约束/);
+    }
+    const exact = runCheckoutScenario(
+      snapshot,
+      { name: 'x', lanesOpen: 4, extraStaff: 1, horizonMin: 30, staffWageCnyPerHour: 25, maxExtraCostCny: 12.5 },
+      42,
+    );
+    expect(exact.ok).toBe(true);
+  });
+
+  it('设置预算但未提供时薪时拒绝（不能编造成本）', () => {
+    const snapshot = peakSnapshot();
+    const evalResult = runCheckoutScenario(
+      snapshot,
+      { name: 'x', lanesOpen: 4, extraStaff: 1, horizonMin: 30, maxExtraCostCny: 10 },
+      42,
+    );
+    expect(evalResult.ok).toBe(false);
+    if (!evalResult.ok) expect(evalResult.why).toMatch(/时薪/);
+  });
+
+  it('调人支援降低等待（方案 C 优于现状 A：服务容量口径回归）', () => {
+    const snapshot = peakSnapshot();
+    const base = runCheckoutScenario(snapshot, { name: 'A 保持现状', lanesOpen: 4, extraStaff: 0, horizonMin: 30 }, 42);
+    const redeploy = runCheckoutScenario(snapshot, { name: 'C 调 1 人支援', lanesOpen: 4, extraStaff: 1, horizonMin: 30 }, 42);
+    expect(base.ok && redeploy.ok).toBe(true);
+    if (base.ok && redeploy.ok) {
+      expect(redeploy.result.metrics.avgWaitMin.mean).toBeLessThan(base.result.metrics.avgWaitMin.mean);
+      expect(redeploy.result.metrics.maxBacklog.mean).toBeLessThan(base.result.metrics.maxBacklog.mean);
+    }
+  });
+
+  it('时薪只影响成本记账，不改变仿真抽样（同 seed 指标完全一致）', () => {
+    const snapshot = peakSnapshot();
+    const withWage = runCheckoutScenario(
+      snapshot,
+      { name: 'x', lanesOpen: 4, extraStaff: 1, horizonMin: 30, staffWageCnyPerHour: 40 },
+      42,
+    );
+    const withoutWage = runCheckoutScenario(snapshot, { name: 'x', lanesOpen: 4, extraStaff: 1, horizonMin: 30 }, 42);
+    expect(withWage.ok && withoutWage.ok).toBe(true);
+    if (withWage.ok && withoutWage.ok) {
+      expect(withWage.result.metrics).toEqual(withoutWage.result.metrics);
+      expect(withWage.result.queueTimeline).toEqual(withoutWage.result.queueTimeline);
+      expect(withWage.result.extraCostCny).not.toBe(withoutWage.result.extraCostCny);
+    }
+  });
+
   it('拒绝超过通道总数的方案', () => {
     const snapshot = peakSnapshot(); // totalLanes = 4+4 = 8
     const evalResult = runCheckoutScenario(snapshot, { name: 'x', lanesOpen: 9, extraStaff: 0, horizonMin: 30 }, 42);
     expect(evalResult.ok).toBe(false);
     if (!evalResult.ok) expect(evalResult.why).toMatch(/超过现有通道总数/);
+  });
+
+  it('调人超过持收银资格人数被拒（岗位资格约束，AT-05）', () => {
+    // 在岗 2 人，持收银资格仅 1 人
+    const snapshot = projectTwinState(
+      [
+        makeSignal({ id: 'arr1', zoneId: 'zone-checkout', metric: 'checkout_arrivals_per_min', unit: '人/分钟', value: 6, observedAt: '2026-11-15T17:59:00Z' }),
+        makeSignal({ id: 'svc1', zoneId: 'zone-checkout', metric: METRICS.checkoutServiceRate, unit: '人/分钟/通道', value: 2.5, observedAt: '2026-11-15T17:59:00Z' }),
+        makeSignal({ id: 'staff1', zoneId: 'zone-checkout', metric: METRICS.staffCount, unit: '人', value: 2, observedAt: '2026-11-15T17:59:00Z' }),
+        makeSignal({ id: 'qual1', zoneId: 'zone-checkout', metric: METRICS.checkoutQualifiedStaff, unit: '人', value: 1, observedAt: '2026-11-15T17:59:00Z' }),
+      ],
+      testLayout,
+      AT,
+    );
+    const evalResult = runCheckoutScenario(snapshot, { name: 'x', lanesOpen: 4, extraStaff: 2, horizonMin: 30 }, 42);
+    expect(evalResult.ok).toBe(false);
+    if (!evalResult.ok) {
+      expect(evalResult.why).toMatch(/持收银资格的在岗人数 1/);
+      expect(evalResult.why).toMatch(/岗位资格/);
+    }
+  });
+
+  it('资格人数无观测时调人方案如实拒绝（UNKNOWN 不放行）', () => {
+    const snapshot = projectTwinState(
+      [
+        makeSignal({ id: 'arr1', zoneId: 'zone-checkout', metric: 'checkout_arrivals_per_min', unit: '人/分钟', value: 6, observedAt: '2026-11-15T17:59:00Z' }),
+        makeSignal({ id: 'svc1', zoneId: 'zone-checkout', metric: METRICS.checkoutServiceRate, unit: '人/分钟/通道', value: 2.5, observedAt: '2026-11-15T17:59:00Z' }),
+        makeSignal({ id: 'staff1', zoneId: 'zone-checkout', metric: METRICS.staffCount, unit: '人', value: 2, observedAt: '2026-11-15T17:59:00Z' }),
+      ],
+      testLayout,
+      AT,
+    );
+    const evalResult = runCheckoutScenario(snapshot, { name: 'x', lanesOpen: 4, extraStaff: 1, horizonMin: 30 }, 42);
+    expect(evalResult.ok).toBe(false);
+    if (!evalResult.ok) expect(evalResult.why).toMatch(/checkout_qualified_staff_count（持收银资格的在岗人数）无可用观测/);
+  });
+
+  it('资格充足时调人通过，假设里登记资格口径（可审计）', () => {
+    const snapshot = peakSnapshot(); // 在岗 2 人且 2 人持资格
+    const evalResult = runCheckoutScenario(snapshot, { name: 'x', lanesOpen: 4, extraStaff: 2, horizonMin: 30 }, 42);
+    expect(evalResult.ok).toBe(true);
+    if (evalResult.ok) {
+      expect(evalResult.result.assumptions['qualifiedStaffAvailable']).toBe(2);
+      expect(evalResult.result.assumptions['serviceCapacity']).toBe(6);
+    }
   });
 
   it('拒绝超过可用员工的调人方案；员工无观测也如实拒绝', () => {
@@ -189,6 +318,7 @@ describe('runCheckoutScenario（S2 缝）', () => {
     if (full.ok) {
       expect(full.baseline.totalLanes).toBe(8);
       expect(full.baseline.availableStaff).toBe(2);
+      expect(full.baseline.qualifiedStaff).toBe(2);
       expect(full.baseline.arrivalRatePerMin).toBe(6);
       expect(full.baseline.initialQueueLength).toBe(5);
     }
@@ -238,6 +368,51 @@ describe('runCheckoutScenario（S2 缝）', () => {
         },
       ),
       { numRuns: 100 },
+    );
+  });
+
+  it('属性：成本核算公式与预算约束对任意参数组合成立（fast-check）', () => {
+    const snapshot = peakSnapshot(); // 在岗 2 人、2 人持资格
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 2 }), // extraStaff（受在岗与资格约束）
+        fc.integer({ min: 10, max: 120 }), // horizonMin
+        fc.integer({ min: 0, max: 50 }), // 时薪（元/小时，合成教学假设）
+        fc.integer({ min: 0, max: 100 }), // 成本预算（元）
+        (staff, horizon, wage, budget) => {
+          const evalResult = runCheckoutScenario(
+            snapshot,
+            { name: 'p', lanesOpen: 4, extraStaff: staff, horizonMin: horizon, staffWageCnyPerHour: wage, maxExtraCostCny: budget },
+            42,
+          );
+          const cost = Math.round((((staff * horizon) / 60) * wage) * 100) / 100;
+          if (cost > budget) return !evalResult.ok;
+          if (!evalResult.ok) return false;
+          return (
+            evalResult.result.extraCostCny === cost &&
+            evalResult.result.extraStaffHours === Math.round(((staff * horizon) / 60) * 100) / 100
+          );
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  it('属性：调人人数在资格内不减服务容量，等待不高于基线（fast-check）', () => {
+    const snapshot = peakSnapshot(); // 在岗 2 人、2 人持资格
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 2 }),
+        fc.integer({ min: 0, max: 2 ** 31 - 1 }),
+        (staff, seed) => {
+          const base = runCheckoutScenario(snapshot, { name: 'base', lanesOpen: 4, extraStaff: 0, horizonMin: 30 }, seed);
+          const more = runCheckoutScenario(snapshot, { name: 'more', lanesOpen: 4, extraStaff: staff, horizonMin: 30 }, seed);
+          if (!base.ok || !more.ok) return false;
+          // 共享 FIFO + 工作保守调度下，服务容量只增不减：期望等待不应升高。
+          return more.result.metrics.avgWaitMin.mean <= base.result.metrics.avgWaitMin.mean + 0.5;
+        },
+      ),
+      { numRuns: 60 },
     );
   });
 });

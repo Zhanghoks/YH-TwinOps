@@ -7,7 +7,7 @@ import {
   type ZoneState,
 } from '@yh/contracts';
 import { sumMetricInWindow } from '@yh/twin-state';
-import { checkoutBaseline, runCheckoutScenario, type CheckoutScenario } from '@yh/simulation';
+import { checkoutBaseline, runCheckoutScenario, TEACHING_WAGE_CNY_PER_HOUR, type CheckoutScenario } from '@yh/simulation';
 
 /**
  * S3 接缝：Agent 工具层是 S1+S2 的函数组合，不引入新的抽象缝隙。
@@ -285,7 +285,8 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
       const trio: CheckoutScenario[] = [
         { name: 'A 保持现状', lanesOpen: lanesOpenNow, extraStaff: 0, horizonMin: 30 },
         { name: 'B 增开 1 条通道', lanesOpen: Math.min(lanesOpenNow + 1, baselineEval.baseline.totalLanes), extraStaff: 0, horizonMin: 30 },
-        { name: 'C 调 1 人支援收银', lanesOpen: lanesOpenNow, extraStaff: 1, horizonMin: 30 },
+        // 方案 C 带合成教学时薪，便于工作台并排比较工时成本；假设里如实登记成本口径。
+        { name: 'C 调 1 人支援收银', lanesOpen: lanesOpenNow, extraStaff: 1, horizonMin: 30, staffWageCnyPerHour: TEACHING_WAGE_CNY_PER_HOUR },
       ];
       const results = trio.map((scenario) => {
         const evalResult = runScenario(snapshot, scenario, seed ?? defaultSeed);
@@ -297,6 +298,7 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
               p95WaitMin: evalResult.result.metrics.p95WaitMin,
               maxBacklog: evalResult.result.metrics.maxBacklog,
               extraStaffHours: evalResult.result.extraStaffHours,
+              extraCostCny: evalResult.result.extraCostCny,
               laneChangeCount: evalResult.result.laneChangeCount,
             }
           : { name: scenario.name, ok: false as const, why: evalResult.why };

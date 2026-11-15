@@ -30,6 +30,8 @@ export const METRICS = {
   equipmentTempC: 'equipment_temp_c',
   equipmentOnline: 'equipment_online',
   staffCount: 'staff_count',
+  /** 持收银操作资格的在岗人数（岗位资格约束的数据来源，AT-05）。 */
+  checkoutQualifiedStaff: 'checkout_qualified_staff_count',
 } as const;
 export type MetricKey = (typeof METRICS)[keyof typeof METRICS];
 

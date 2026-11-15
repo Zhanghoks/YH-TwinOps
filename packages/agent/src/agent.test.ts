@@ -47,6 +47,7 @@ function busySignals(): TwinSignal[] {
     makeSignal({ id: 'q1', zoneId: 'zone-checkout', metric: METRICS.queueLength, unit: '人', value: 16, observedAt: '2026-11-15T17:59:00Z' }),
     makeSignal({ id: 'lanes1', zoneId: 'zone-checkout', metric: METRICS.checkoutLanesOpen, unit: '条', value: 4, observedAt: '2026-11-15T17:59:00Z' }),
     makeSignal({ id: 'staff1', zoneId: 'zone-checkout', metric: METRICS.staffCount, unit: '人', value: 2, observedAt: '2026-11-15T17:59:00Z' }),
+    makeSignal({ id: 'qual1', zoneId: 'zone-checkout', metric: METRICS.checkoutQualifiedStaff, unit: '人', value: 2, observedAt: '2026-11-15T17:59:00Z' }),
     makeSignal({ id: 'sale1', zoneId: 'zone-checkout', metric: METRICS.salesAmount, unit: '元', value: 300, observedAt: '2026-11-15T17:58:00Z' }),
   ];
 }
@@ -140,10 +141,23 @@ describe('Agent 工具层（S3 缝）', () => {
     const { tools } = makeTools();
     const result = tools.compare_scenarios({ seed: 42 });
     expect(result.status).toBe('OK');
-    const scenarios = result.data['scenarios'] as { name: string; ok: boolean }[];
+    const scenarios = result.data['scenarios'] as {
+      name: string;
+      ok: boolean;
+      avgWaitMin?: { mean: number };
+      extraCostCny?: number | null;
+    }[];
     expect(scenarios).toHaveLength(3);
     expect(scenarios.every((s) => s.ok)).toBe(true);
     expect(result.data['note']).toMatch(/模拟情景/);
+    // 方案 A/B 未提供时薪：成本如实留空；方案 C 带合成教学时薪：成本可核算。
+    const byName = new Map(scenarios.map((s) => [s.name, s]));
+    const a = byName.get('A 保持现状');
+    const c = byName.get('C 调 1 人支援收银');
+    expect(a?.extraCostCny ?? null).toBeNull();
+    expect(c?.extraCostCny).toBe(12.5);
+    // 调 1 人支援（+1 服务通道）在相同种子下等待不高于现状。
+    expect(c?.avgWaitMin?.mean).toBeLessThanOrEqual(a?.avgWaitMin?.mean ?? Number.POSITIVE_INFINITY);
   });
 
   it('propose_action_plan 只产出待审批草案（sandbox），不写任何真实系统', () => {

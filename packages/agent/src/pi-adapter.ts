@@ -54,13 +54,15 @@ export function piToolSpecs(): Tool[] {
   });
   const scenarioSchema = {
     type: 'object',
-    description: '收银方案配置',
+    description: '收银方案配置；调人支援需持收银资格（checkout_qualified_staff_count 约束）',
     properties: {
       name: { type: 'string' },
       lanesOpen: { type: 'number' },
       extraStaff: { type: 'number' },
       horizonMin: { type: 'number' },
       baselineLanesOpen: { type: 'number' },
+      staffWageCnyPerHour: { type: 'number', description: '可选：调人时薪（元/小时，合成教学假设），提供后核算成本' },
+      maxExtraCostCny: { type: 'number', description: '可选：调人成本预算上限（元），超预算方案被拒绝；需同时提供时薪' },
     },
     required: ['name', 'lanesOpen', 'extraStaff', 'horizonMin'],
   } as const;
