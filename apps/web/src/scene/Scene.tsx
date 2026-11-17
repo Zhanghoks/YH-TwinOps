@@ -359,7 +359,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
       <color attach="background" args={['#e8eceb']} />
       {/* shell 模型自带较暗的烘焙色调，光照对齐老原型的强度口径 */}
       <hemisphereLight args={[shellMode ? '#e5fff0' : '#fff3d9', shellMode ? '#34413e' : '#56615c', shellMode ? 2.1 : 1.05]} />
-      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.65} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
+      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.65} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={referenceRegions ? -75 : -60} shadow-camera-right={referenceRegions ? 75 : 60} shadow-camera-top={referenceRegions ? 75 : 60} shadow-camera-bottom={referenceRegions ? -75 : -60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
       <OrbitControls target={camera.target} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={Math.max(220, layout.depthM * 4)} />
       {referenceRegions && cameraView === 'top' && <FitReferenceTop width={layout.widthM} depth={layout.depthM} center={groundCenter} />}
 
