@@ -280,7 +280,7 @@ function ZoneNode({
   );
 }
 
-export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number] }) {
+export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, planningGuides }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; planningGuides?: { centralWidthM: number; crossZ0: number; crossZ1: number } }) {
   const layer = useWorkbench((s) => s.layer);
   const selection = useWorkbench((s) => s.selection);
   const select = useWorkbench((s) => s.select);
@@ -336,6 +336,18 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
         <StoreEnvelope layout={layout} center={groundCenter} />
         <DetailedFixtures fixtures={layout.fixtures} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
       </>}
+
+      {/* Planning overlays only: not painted surfaces or regulatory clearance certification. */}
+      {planningGuides && !shellMode && <group>
+        <mesh position={[0, .025, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}>
+          <planeGeometry args={[planningGuides.centralWidthM, layout.depthM]} />
+          <meshBasicMaterial color="#829e91" transparent opacity={.20} depthWrite={false} />
+        </mesh>
+        <mesh position={[0, .026, (planningGuides.crossZ0 + planningGuides.crossZ1) / 2]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}>
+          <planeGeometry args={[layout.widthM, planningGuides.crossZ1 - planningGuides.crossZ0]} />
+          <meshBasicMaterial color="#829e91" transparent opacity={.20} depthWrite={false} />
+        </mesh>
+      </group>}
 
       {/* 分区数据叠加层与标签 */}
       {layout.zones.map((z) => {
