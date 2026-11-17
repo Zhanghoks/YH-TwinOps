@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { buildSceneCamera } from './sceneCamera';
 
 describe('scene camera presets', () => {
+  it('scales overview and top framing for the reference 130 by 100 metre candidate', () => {
+    const base = buildSceneCamera('top', [0, 0], 50, 80);
+    const reference = buildSceneCamera('top', [0, 0], 100, 130);
+    expect(reference.position[1]).toBe(base.position[1] * 1.625);
+    expect(buildSceneCamera('overview', [0, 0], 100, 130).position).toEqual([96, 128, 156]);
+  });
+
   it('keeps entrance inspection outside the store and looks past the fascia', () => {
     const view = buildSceneCamera('entrance', [10, 20], 50);
     expect(view.position[2]).toBeGreaterThan(45);
