@@ -79,6 +79,41 @@ describe('procedural fixture detail', () => {
     expect(parts.some((p) => p.material === 'glass')).toBe(true);
   });
 
+  it('uses stable zone themes and distinct merchandising shapes, not fixture-ID random accents', () => {
+    const themed = (zoneId: string, fixtureId = 'F024') => buildFixtureDetail(fixture({ zoneId, fixtureId }));
+    const count = (zoneId: string, prefix: string) => themed(zoneId).filter((p) => p.id.startsWith(prefix)).length;
+    expect(count('zone-beverages', 'pack-bottle-')).toBeGreaterThan(count('zone-beverages', 'pack-box-'));
+    expect(count('zone-packaged', 'pack-box-')).toBeGreaterThan(count('zone-packaged', 'pack-bottle-'));
+    expect(count('zone-household', 'pack-bottle-')).toBeGreaterThan(count('zone-household', 'pack-box-'));
+    expect(count('zone-bulk', 'pack-sack-')).toBeGreaterThan(0);
+    const plinth = (zoneId: string, fixtureId = 'F024') => themed(zoneId, fixtureId).find((p) => p.id === 'plinth');
+    expect(plinth('zone-bulk')?.material).toBe('wood');
+    expect(plinth('zone-household')?.color).not.toBe(plinth('zone-packaged')?.color);
+    expect(plinth('zone-household', 'F001')?.color).toBe(plinth('zone-household', 'F099')?.color);
+    expect(themed('zone-packaged').filter((p) => p.id.startsWith('end-panel-'))).toHaveLength(2);
+    const bottleHeight = (zoneId: string) => Math.max(...themed(zoneId).filter((p) => p.id.startsWith('pack-bottle-')).map((p) => p.size[1]));
+    expect(bottleHeight('zone-household')).toBeGreaterThan(bottleHeight('zone-beverages'));
+  });
+
+  it('makes the existing beverage-zone FREEZER stock recognizable as bottles', () => {
+    const parts = buildFixtureDetail(fixture({ zoneId: 'zone-beverages', fixtureType: 'FREEZER' }));
+    expect(parts.some((p) => p.id.startsWith('chilled-bottle-') && p.primitive === 'sphere')).toBe(true);
+  });
+
+  it('keeps themed wide gondolas bounded and within the per-fixture detail budget', () => {
+    for (const zoneId of ['zone-beverages', 'zone-household', 'zone-packaged', 'zone-bulk']) {
+      const f = fixture({ zoneId, widthM: 12, depthM: 4, heightM: 3.5 });
+      const parts = buildFixtureDetail(f);
+      expect(parts.length).toBeLessThan(300);
+      for (const part of parts) {
+        expect(Math.abs(part.position[0]) + part.size[0] / 2).toBeLessThanOrEqual(f.widthM / 2 + 1e-9);
+        expect(Math.abs(part.position[2]) + part.size[2] / 2).toBeLessThanOrEqual(f.depthM / 2 + 1e-9);
+        expect(part.position[1] - part.size[1] / 2).toBeGreaterThanOrEqual(-1e-9);
+        expect(part.position[1] + part.size[1] / 2).toBeLessThanOrEqual(f.heightM + 1e-9);
+      }
+    }
+  });
+
   it('rejects invalid dimensions before producing render transforms', () => {
     for (const widthM of [0, -1, Infinity, NaN]) {
       expect(() => buildFixtureDetail(fixture({ widthM }))).toThrow(RangeError);
