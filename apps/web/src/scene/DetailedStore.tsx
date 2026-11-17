@@ -13,7 +13,7 @@ const MATERIALS = ['metal', 'wood', 'glass', 'product', 'label', 'rubber'] as co
 
 
 /** Shared per batch, not per item; no extra meshes, materials or draw calls. */
-function useSurfaceMaps(kind: SurfaceKind | undefined) {
+function useSurfaceMaps(kind: SurfaceKind | undefined, repeatX = 1, repeatY = 1) {
   const maps = useMemo(() => {
     if (kind === undefined) return undefined;
     const pixels = buildSurfacePixels(kind);
@@ -21,6 +21,7 @@ function useSurfaceMaps(kind: SurfaceKind | undefined) {
       const texture = new THREE.DataTexture(bytes, pixels.width, pixels.height, THREE.RGBAFormat);
       texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(repeatX, repeatY);
       texture.magFilter = THREE.LinearFilter;
       texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.generateMipmaps = true;
@@ -28,7 +29,7 @@ function useSurfaceMaps(kind: SurfaceKind | undefined) {
       return texture;
     };
     return { color: make(pixels.color, true), roughness: make(pixels.roughness, false), bump: make(pixels.heightMap, false) };
-  }, [kind]);
+  }, [kind, repeatX, repeatY]);
   useEffect(() => {
     if (maps === undefined) return;
     // Effect replay can reuse the CPU arrays after a renderer has released its GPU copies.
@@ -138,6 +139,7 @@ function ArchitectureBatch({ parts, primitive, transparent, emissive }: { parts:
 export function StoreEnvelope({ layout, center, reference = false }: { layout: StoreLayout; center: readonly [number, number]; reference?: boolean }) {
   const w = layout.widthM;
   const d = layout.depthM;
+  const floorSurface = useSurfaceMaps(reference ? 'floorTile' : undefined, w / 2, d / 2);
   const signTexture = useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 1024; canvas.height = 128;
@@ -163,14 +165,19 @@ export function StoreEnvelope({ layout, center, reference = false }: { layout: S
   }, [w, d, reference, layout.fixtures]);
   return <group position={[center[0], 0, center[1]]}>
     <mesh position={[0, -.13, 0]} receiveShadow>
-      <boxGeometry args={[w + .6, .24, d + .6]} /><meshStandardMaterial color="#e8e2d3" roughness={.72} />
+      <boxGeometry args={[w + .6, .24, d + .6]} /><meshStandardMaterial color={reference ? '#ecebe5' : '#e8e2d3'} roughness={.72} />
     </mesh>
+    {reference && <mesh position={[0, -.008, 0]} rotation={[-Math.PI / 2,0,0]} receiveShadow>
+      <planeGeometry args={[w,d]} /><meshStandardMaterial color="#f1f0e9" map={floorSurface?.color} roughnessMap={floorSurface?.roughness} bumpMap={floorSurface?.bump} roughness={1} bumpScale={.004} />
+    </mesh>}
+    {!reference && <>
     {Array.from({ length: Math.floor(w / 2) + 1 }, (_, i) => <mesh key={`x-${i}`} position={[-w / 2 + i * 2, .002, 0]}>
       <boxGeometry args={[.024, .005, d]} /><meshBasicMaterial color="#ded8cb" />
     </mesh>)}
     {Array.from({ length: Math.floor(d / 2) + 1 }, (_, i) => <mesh key={`z-${i}`} position={[0, .002, -d / 2 + i * 2]}>
       <boxGeometry args={[w, .005, .024]} /><meshBasicMaterial color="#ded8cb" />
     </mesh>)}
+    </>}
     <mesh position={[0, 1.8, -d / 2 - .45]} receiveShadow>
       <boxGeometry args={[w + .5, 3.6, .28]} /><meshStandardMaterial color="#e0d8c8" roughness={.8} />
     </mesh>
