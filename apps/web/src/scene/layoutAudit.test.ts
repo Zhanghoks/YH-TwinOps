@@ -2,11 +2,24 @@ import { describe, expect, it } from 'vitest';
 import type { Fixture, StoreLayout } from '@yh/contracts';
 import { auditStoreLayout } from './layoutAudit';
 import { layout } from '../data';
+import { generatePlanningLayout } from './planningLayout';
 
 const fixture = (id: string, x: number, z: number, extra: Partial<Fixture> = {}): Fixture => ({ fixtureId: id, zoneId: 'z', fixtureType: 'GONDOLA', assetId: 'generic', x, y: 0, z, rotationY: 0, widthM: 2, depthM: 1, heightM: 1.5, fixed: true, categoryIds: [], ...extra });
 const store = (fixtures: Fixture[]): StoreLayout => ({ storeId: 'test', name: 'Test', synthetic: true, widthM: 20, depthM: 20, zones: [{ zoneId: 'z', name: 'Test', zoneType: 'GROCERY', polygonM: [[-10,-10],[10,-10],[10,10],[-10,10]] }], fixtures });
 
 describe('read-only layout geometry audit', () => {
+  it('independently audits the candidate without treating relabelled zones as collision proof', () => {
+    const { layout: candidate } = generatePlanningLayout(layout);
+    const result = auditStoreLayout(candidate);
+    expect(result.fixtureCount).toBe(150);
+    expect(result.overlapPairs).toEqual([]);
+    expect(result.outsideStoreIds).toEqual([]);
+    expect(result.outsideZoneFixtureIds).toEqual([]);
+    expect(result.narrowGaps).toEqual([]);
+    expect(result.warningCodes).toContain('GEOMETRY_ONLY_NOT_COMPLIANCE');
+    expect(result.warningCodes).toContain('NO_DOOR_METADATA');
+  });
+
   it('reports current fixed baseline facts without modifying IDs or positions', () => {
     const before = JSON.stringify(layout);
     const report = auditStoreLayout(layout);
