@@ -56,6 +56,29 @@ describe('procedural fixture detail', () => {
     expect(JSON.stringify(layout)).toBe(before);
   });
 
+  it('leaves gondola merchandise visible from above instead of covering the entire shelf', () => {
+    const f = fixture();
+    const parts = buildFixtureDetail(f);
+    const cap = parts.find((p) => p.id === 'top-cap');
+    expect(cap).toBeDefined();
+    expect(cap?.size[2]).toBeLessThan(f.depthM * 0.12);
+    const products = parts.filter((p) => p.material === 'product');
+    expect(new Set(products.map((p) => p.primitive)).size).toBe(2);
+    expect(new Set(products.map((p) => p.size[1])).size).toBeGreaterThan(4);
+    expect(parts.some((p) => p.id.includes('bottle-neck'))).toBe(true);
+    expect(parts.some((p) => p.id.includes('jar-lid'))).toBe(true);
+  });
+
+  it('uses a narrow front freezer header rather than an opaque full-depth lid', () => {
+    const f = fixture({ fixtureType: 'FREEZER' });
+    const parts = buildFixtureDetail(f);
+    const header = parts.find((p) => p.id === 'header');
+    expect(header).toBeDefined();
+    expect(header?.size[2]).toBeLessThan(f.depthM * 0.12);
+    expect(header?.position[2]).toBeGreaterThan(f.depthM * 0.4);
+    expect(parts.some((p) => p.material === 'glass')).toBe(true);
+  });
+
   it('rejects invalid dimensions before producing render transforms', () => {
     for (const widthM of [0, -1, Infinity, NaN]) {
       expect(() => buildFixtureDetail(fixture({ widthM }))).toThrow(RangeError);
