@@ -41,13 +41,13 @@ describe('scene presentation controls', () => {
     expect(state().showLabels).toBe(true);
     const baseline = JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').layout;
     await user.click(screen.getByRole('button', { name: '布局检查' }));
-    await user.click(screen.getByRole('button', { name: '规划候选' }));
+    await user.click(screen.getByRole('button', { name: '按图候选' }));
     const candidate = JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').layout;
     expect(candidate.fixtures.map((f: { fixtureId: string }) => f.fixtureId)).toEqual(baseline.fixtures.map((f: { fixtureId: string }) => f.fixtureId));
     expect(candidate.fixtures[0].x).not.toBe(baseline.fixtures[0].x);
     expect(screen.getByRole('radio', { name: '原始外壳' }).hasAttribute('disabled')).toBe(true);
     expect(state().cameraView).toBe('top');
-    expect(screen.getByText(/独立候选，未批准/)).toBeTruthy();
+    expect(screen.getByText(/按用户概念分布图重建/)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: '原型基线' }));
     expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').layout).toEqual(baseline);
     vi.unstubAllGlobals();
