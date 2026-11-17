@@ -120,8 +120,13 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
           add(`${id}-side-${edge}`, [x + edge * .14, .8, z], [.014, .16, .43], COLORS.wood, 'wood');
           add(`${id}-end-${edge}`, [x, .8, z + edge * .215], [.28, .16, .014], COLORS.wood, 'wood');
         }
-        for (let n = 0; n < 6; n++) {
-          add(`${id}-fruit-${n}`, [x + (n % 3 - 1) * .076 + ((n + col) % 2) * .006, .81 + (n % 2) * .02, z + (Math.floor(n / 3) - .5) * .18 + ((n + row) % 3 - 1) * .009], [.059 + (n % 3) * .004, .11 + (n % 2) * .015, .12 + (n % 3) * .01], colorAt(FRUIT, row * 3 + col), 'product', 'sphere');
+        // A low merchandise bed avoids empty black crates. Surface fruit is illustrative,
+        // physically capped instead of growing to 40cm apples on wide inferred islands.
+        add(`${id}-produce-bed`, [x, .78, z], [.26, .045, .4], colorAt(FRUIT, row * 3 + col), 'product');
+        for (let n = 0; n < 24; n++) {
+          add(`${id}-fruit-${n}`, [x + (n % 6 - 2.5) * .043, .815 + (n % 2) * .012, z + (Math.floor(n / 6) - 1.5) * .095],
+            [Math.min(.035, .18 / f.widthM), Math.min(.09, .15 / f.heightM), Math.min(.075, .18 / f.depthM)],
+            colorAt(FRUIT, row * 3 + col + (n % 7 === 0 ? 1 : 0)), 'product', 'sphere');
         }
         add(`${id}-price`, [x, .83, z + .225], [.12, .07, .008], COLORS.label, 'label');
       }
