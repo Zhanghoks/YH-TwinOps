@@ -10,7 +10,7 @@ export interface ArchitecturePart {
 }
 
 /** Generic retail architecture inspired by reference composition, without logos or real-world claims. */
-export function buildStoreArchitecture(width: number, depth: number): ArchitecturePart[] {
+export function buildStoreArchitecture(width: number, depth: number, options: { entranceCenterX?: number; entranceWidthM?: number; neutralFacade?: boolean } = {}): ArchitecturePart[] {
   if (![width, depth].every((v) => Number.isFinite(v) && v > 0)) {
     throw new RangeError('Store dimensions must be finite and positive');
   }
@@ -23,15 +23,16 @@ export function buildStoreArchitecture(width: number, depth: number): Architectu
   const back = -depth / 2 - .23 * scale;
   const dark = '#444640', cream = '#e9e1ce';
   // A shallow red retail fascia provides orientation; centre entry remains open below it.
-  add('front-fascia', [0, 2.9 * scale, front], [width + .5 * scale, 1.0 * scale, .3 * scale], '#b82d38');
+  add('front-fascia', [0, 2.9 * scale, front], [width + .5 * scale, options.neutralFacade ? .28 * scale : 1.0 * scale, .3 * scale], options.neutralFacade ? '#a6a89f' : '#b82d38');
   add('front-fascia-cap', [0, 3.42 * scale, front], [width + .52 * scale, .045 * scale, .38 * scale], cream);
   add('front-warm-light', [0, 2.36 * scale, front], [width, .035 * scale, .08 * scale], '#ffe8b5', { emissive: true });
   const frontBays = Math.min(14, Math.max(4, Math.ceil(width / 5)));
   const bayWidth = width / frontBays;
-  const entryHalfWidth = Math.min(width * .13, 4);
+  const entryHalfWidth = options.entranceWidthM === undefined ? Math.min(width * .13, 4) : options.entranceWidthM / 2;
+  const entryCenter = options.entranceCenterX ?? 0;
   for (let i = 0; i < frontBays; i++) {
     const x = -width / 2 + (i + .5) * bayWidth;
-    if (Math.abs(x) < entryHalfWidth) continue;
+    if (Math.abs(x - entryCenter) < entryHalfWidth + (options.entranceWidthM === undefined ? 0 : bayWidth / 2)) continue;
     const id = `front-${i}`;
     add(`${id}-sill`, [x, .1 * scale, front], [bayWidth * .94, .2 * scale, .27 * scale], dark);
     add(`${id}-glazing`, [x, .7 * scale, front], [bayWidth * .92, 1.0 * scale, .04 * scale], '#b7d7d3', { transparent: true });
