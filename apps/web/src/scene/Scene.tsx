@@ -1,8 +1,8 @@
 import { REFERENCE_SERVICE_LABELS } from './referenceArchitecture';
-import type { ReferenceRegion } from './planningLayout';
+import { buildReferenceDisplayFixtures, type ReferenceRegion } from './planningLayout';
 /** StoreLayout-driven single-canvas scene; procedural detail never changes business geometry. */
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { buildSceneCamera, type CameraView } from './sceneCamera';
+import { buildSceneCamera, fitTopViewHeight, type CameraView } from './sceneCamera';
 import { DetailedFixtures, StoreEnvelope } from './DetailedStore';
 import * as THREE from 'three';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
@@ -25,6 +25,18 @@ function SettleView({ revision }: { revision: string }) {
     const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => invalidate()); });
     return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
   }, [invalidate, revision]);
+  return null;
+}
+
+/** Candidate top view refits on focus-mode/window resize, not on every animation frame. */
+function FitReferenceTop({ width, depth, center }: { width: number; depth: number; center: readonly [number, number] }) {
+  const { camera, size, invalidate } = useThree();
+  useEffect(() => {
+    camera.position.set(center[0], fitTopViewHeight(width, depth, size.width, size.height), center[1] + .1);
+    camera.lookAt(center[0], 0, center[1]);
+    camera.updateProjectionMatrix();
+    invalidate();
+  }, [camera, size.width, size.height, width, depth, center[0], center[1], invalidate]);
   return null;
 }
 
@@ -311,6 +323,8 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
   const colors = layerColors(layer);
   const shellMode = mode === 'shell' && manifest.shellUrl !== undefined;
   const detailed = mode === 'detail';
+  // These 49 image-inferred shelves are visual skins only; never enter snapshot or selection.
+  const referenceDisplays = useMemo(() => referenceRegions ? buildReferenceDisplayFixtures(layout) : [], [layout, referenceRegions]);
   const zoneById = useMemo(() => Object.fromEntries(Object.values(snapshot.zones).map((z) => [z.zoneId, z])), [snapshot]);
 
   const zoneRects = useMemo(
@@ -345,6 +359,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
       <hemisphereLight args={[shellMode ? '#e5fff0' : '#fff3d9', shellMode ? '#34413e' : '#56615c', shellMode ? 2.1 : 1.05]} />
       <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.65} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
       <OrbitControls target={camera.target} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={Math.max(220, layout.depthM * 4)} />
+      {referenceRegions && cameraView === 'top' && <FitReferenceTop width={layout.widthM} depth={layout.depthM} center={groundCenter} />}
 
       {/* 地面（白膜模式）与取消选择热区 */}
       <mesh position={[groundCenter[0], detailed ? -0.04 : -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
@@ -359,7 +374,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
 
       {detailed && <>
         <StoreEnvelope layout={layout} center={groundCenter} reference={!!referenceRegions} />
-        <DetailedFixtures fixtures={layout.fixtures} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
+        <DetailedFixtures fixtures={layout.fixtures} decorations={referenceDisplays} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
       </>}
 
       <ReadyLabels>
