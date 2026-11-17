@@ -55,6 +55,16 @@ describe('decorative store architecture', () => {
     }
   });
 
+  it('supports a separate left-side reference entrance without changing the baseline default', () => {
+    const base = buildStoreArchitecture(80, 50);
+    expect(base).toEqual(buildStoreArchitecture(80, 50, {}));
+    const reference = buildStoreArchitecture(130, 100, { entranceCenterX: -22.5, entranceWidthM: 23, neutralFacade: true });
+    for (const p of reference.filter((p) => /^front-\d+-(glazing|sill)$/.test(p.id))) {
+      expect(p.position[0] + p.size[0] / 2 <= -34 || p.position[0] - p.size[0] / 2 >= -11).toBe(true);
+    }
+    expect(reference.find((p) => p.id === 'front-fascia')?.color).toBe('#a6a89f');
+  });
+
   it('rejects invalid dimensions', () => {
     for (const bad of [0, -1, Infinity, NaN]) {
       expect(() => buildStoreArchitecture(bad, 10)).toThrow(RangeError);
