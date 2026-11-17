@@ -217,7 +217,7 @@ button {
   min-height: 0;
   overflow: hidden;
 }
-.canvas-wrap > div:not(.layer-bar):not(.scene-controls):not(.scene-mode-note):not(.layout-review) {
+.canvas-wrap > .scene-canvas {
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -936,3 +936,6 @@ code {
 .layout-review button[aria-pressed='true'] { background: #8f342d; color: white; border-color: #8f342d; }
 .layout-review .gap-row { display: block; width: 100%; text-align: left; margin-top: 5px; }
 .layout-review-caution { color: #8b4d22; font-size: 11px; }
+
+/* Stable fallback before Drei assigns its first inline depth index. */
+.reference-html-anchor { z-index: 9; pointer-events: none; }
