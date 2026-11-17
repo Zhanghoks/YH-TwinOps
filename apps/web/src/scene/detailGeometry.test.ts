@@ -120,3 +120,11 @@ describe('procedural fixture detail', () => {
     }
   });
 });
+
+it('caps produce item scale instead of enlarging fruit with a wide reference island', () => {
+  const parts = buildFixtureDetail(fixture({ fixtureType: 'PRODUCE_ISLAND', widthM: 7, depthM: 3 }));
+  const fruit = parts.filter((p)=>p.id.includes('-fruit-'));
+  expect(fruit).toHaveLength(144);
+  expect(fruit.every((p)=>p.size[0] <= .18 && p.size[1] <= .15 && p.size[2] <= .18)).toBe(true);
+  expect(parts.some((p)=>p.id.endsWith('produce-bed'))).toBe(true);
+});
