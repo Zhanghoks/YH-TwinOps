@@ -133,7 +133,7 @@ describe('fresh departments follow the reference silhouette', () => {
     const { buildReferenceDisplayFixtures } = await import('./planningLayout');
     const { layout } = generatePlanningLayout(baseline);
     const displays = buildReferenceDisplayFixtures(layout);
-    expect(displays).toHaveLength(53);
+    expect(displays).toHaveLength(55);
     const { report } = generatePlanningLayout(baseline);
     for (const f of displays) {
       const region = report.referenceRegions.find((r) => r.zoneIds.includes(f.zoneId))!;
@@ -150,5 +150,22 @@ describe('fresh departments follow the reference silhouette', () => {
       expect(layout.fixtures.filter((f) => f.zoneId === id && f.rotationY === Math.PI/2).length).toBeGreaterThanOrEqual(2);
     }
     expect(validatePlanningLayout({...layout, fixtures:[...layout.fixtures,...displays]}).issues).toEqual([]);
+  });
+});
+
+describe('remaining reference perimeter refinements', () => {
+  it('closes east-side fresh-counter silhouettes without joining business state', async () => {
+    const { buildReferenceDisplayFixtures } = await import('./planningLayout');
+    const { layout } = generatePlanningLayout(baseline);
+    const displays = buildReferenceDisplayFixtures(layout);
+    expect(displays).toHaveLength(55);
+    for (const id of ['zone-seafood','zone-meat']) {
+      const edge = displays.filter((f) => f.zoneId === id);
+      expect(edge).toHaveLength(1);
+      expect(edge[0]!.rotationY).toBe(Math.PI/2);
+    }
+    expect(validatePlanningLayout({...layout, fixtures:[...layout.fixtures,...displays]}).issues).toEqual([]);
+    const produce = layout.fixtures.filter((f) => f.zoneId === 'zone-produce' && f.rotationY === 0 && f.z < 25);
+    expect(produce.every((f) => f.depthM >= 4.4)).toBe(true);
   });
 });
