@@ -49,3 +49,15 @@ Visual judgment: this is an improved procedural low-poly operations model, **not
 5. Run the existing YH approval E2E flow and visually review shadows/glass on the target machine.
 
 This pass is deliberately a draft until that visual acceptance is complete. Fine asset art direction, ceiling services, walk-through camera, measured store capture and real sensor/POS ingestion are not implemented here.
+
+## Reference-driven iteration (cloud Firefox)
+
+The owner supplied a rendered supermarket cockpit reference. This is an art-direction reference, not evidence for its displayed sales, visitor counts, measured area, or brand permission. The runnable teaching layout remains 80 × 50 m and its data remains synthetic.
+
+- Open gondola top spines and narrow freezer headers replace full-depth dark lids. Generic cartons, bottles and jars vary deterministically; produce colors/placement are less uniform. Fixture geometry remains inside the existing envelopes (17,907 parts, seven material/primitive batches).
+- A tested, bounded perimeter generator adds a generic red fascia, partial glazing, window frames, exterior planting and rear luminaires. All architectural parts remain outside the operating floor; no new interior collision objects or second Canvas.
+- Compact readable wayfinding removes redundant raw IDs. The clipped world-space teaching caption is now a fixed overlay with layout dimensions.
+- The first actual Firefox screenshot exposed an obscured rear light strip and an overly thin fascia. A second build moves the wall behind the light strip and enlarges the fascia, then repeats screenshot review. The updated shelf `F086` was clicked, highlighted and linked to its original semantic metadata.
+- Validation: full `npm run check` passed 481 root tests and 3 web tests. After the small second-pass architecture adjustment, 16 geometry/architecture tests, web typecheck and web build passed.
+
+Still visibly short of the reference: no photoreal scanned/PBR assets, category-specific merchandising diversity, populated shopping simulation, believable ceiling services, detailed entrance plaza or measured shop capture. The scene remains a simplified procedural model. No invented live KPIs or fake heatmap population were added just to imitate the image. Screenshot review is not an FPS benchmark or full acceptance of every mode/fixture.
