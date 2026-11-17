@@ -17,7 +17,8 @@ const COLORS = {
   glass: '#b9dce1', label: '#f4edcf', white: '#e9e9e2', trim: '#58756a',
 };
 const PACKS = ['#b75e48', '#d9ae58', '#729b8c', '#e1d3ac', '#698ba1', '#bc927c'];
-const FRUIT = ['#b6bf54', '#df9b3f', '#c66d47', '#779b55', '#d6bf67', '#9e5247'];
+// Muted vegetable / apple / citrus shades, avoiding toy-like primary colours.
+const FRUIT = ['#82934c', '#c9943e', '#ac5943', '#587d49', '#bfad67', '#843f37'];
 
 /**
  * Original generic merchandising, not measured stock, inventory, brand packaging or real SKU data.
@@ -42,7 +43,7 @@ export function buildFixtureDetail(f: Fixture): DetailPart[] {
     case 'GONDOLA': {
       add('plinth', [0, .045, 0], [.98, .09, .96], COLORS.dark);
       add('central-spine', [0, .52, 0], [.95, .92, .035], COLORS.white);
-      for (const x of [-.47, .47]) add(`upright-${x}`, [x, .52, 0], [.025, .96, .91], COLORS.metal);
+      for (const x of [-.47, .47]) add(`upright-${x}`, [x, .52, 0], [.025, .96, .055], COLORS.metal);
       for (let level = 0; level < 4; level++) {
         const y = .13 + level * .205;
         add(`shelf-${level}`, [0, y, 0], [.96, .026, .93], COLORS.white);
@@ -50,14 +51,30 @@ export function buildFixtureDetail(f: Fixture): DetailPart[] {
           add(`price-rail-${level}-${side}`, [0, y + .015, side * .468], [.95, .035, .018], COLORS.trim);
           for (let col = 0; col < bays; col++) {
             const x = xAt(col, bays);
-            const height = .12 + ((col + level) % 3) * .015;
-            add(`pack-${level}-${side}-${col}`, [x, y + .013 + height / 2, side * .24], [.70 / bays, height, .35], colorAt(PACKS, col + level), 'product');
-            add(`pack-label-${level}-${side}-${col}`, [x, y + .07, side * .418], [.42 / bays, .045, .008], COLORS.label, 'label');
+            const kind = (col + level) % 3;
+            const height = .115 + ((col + level) % 5) * .012;
+            const bottom = y + .013;
+            const id = `${level}-${side}-${col}`;
+            const color = colorAt(PACKS, col + level);
+            if (kind === 1) {
+              // Rounded bottle body with a narrow neck and closure, no new mesh primitive.
+              add(`pack-bottle-${id}`, [x, bottom + height * .375, side * .24], [.54 / bays, height * .75, .22], color, 'product', 'sphere');
+              add(`bottle-neck-${id}`, [x, bottom + height * .80, side * .24], [.20 / bays, height * .20, .08], color, 'product');
+              add(`bottle-cap-${id}`, [x, bottom + height * .96, side * .24], [.24 / bays, height * .08, .10], COLORS.white, 'label');
+            } else if (kind === 2) {
+              add(`pack-jar-${id}`, [x, bottom + height * .44, side * .24], [.65 / bays, height * .88, .25], color, 'product', 'sphere');
+              add(`jar-lid-${id}`, [x, bottom + height * .93, side * .24], [.52 / bays, height * .10, .20], COLORS.metal);
+            } else {
+              add(`pack-box-${id}`, [x, bottom + height / 2, side * .24], [.70 / bays, height, .31], color, 'product');
+            }
+            const face = kind === 1 ? .343 : kind === 2 ? .357 : .398;
+            add(`pack-label-${id}`, [x, bottom + height * .43, side * face], [.36 / bays, height * .30, .008], COLORS.label, 'label');
             add(`price-${level}-${side}-${col}`, [x, y + .018, side * .479], [.38 / bays, .021, .006], COLORS.white, 'label');
           }
         }
       }
-      add('top-cap', [0, .985, 0], [.98, .03, .97], COLORS.trim);
+      // Only the narrow spine is capped: an overhead lid would hide the merchandise.
+      add('top-cap', [0, .985, 0], [.98, .03, .065], COLORS.metal);
       break;
     }
     case 'PRODUCE_ISLAND': {
@@ -73,7 +90,7 @@ export function buildFixtureDetail(f: Fixture): DetailPart[] {
           add(`${id}-end-${edge}`, [x, .8, z + edge * .215], [.28, .16, .014], COLORS.wood, 'wood');
         }
         for (let n = 0; n < 6; n++) {
-          add(`${id}-fruit-${n}`, [x + (n % 3 - 1) * .076, .815 + (n % 2) * .025, z + (Math.floor(n / 3) - .5) * .19], [.067, .13, .14], colorAt(FRUIT, row * 3 + col), 'product', 'sphere');
+          add(`${id}-fruit-${n}`, [x + (n % 3 - 1) * .076 + ((n + col) % 2) * .006, .81 + (n % 2) * .02, z + (Math.floor(n / 3) - .5) * .18 + ((n + row) % 3 - 1) * .009], [.059 + (n % 3) * .004, .11 + (n % 2) * .015, .12 + (n % 3) * .01], colorAt(FRUIT, row * 3 + col), 'product', 'sphere');
         }
         add(`${id}-price`, [x, .83, z + .225], [.12, .07, .008], COLORS.label, 'label');
       }
@@ -81,9 +98,10 @@ export function buildFixtureDetail(f: Fixture): DetailPart[] {
     }
     case 'FREEZER': {
       const doors = Math.min(5, Math.max(2, Math.round(f.widthM / .85)));
-      add('cabinet-back', [0, .5, -.44], [.99, 1, .12], COLORS.dark);
+      add('cabinet-back', [0, .5, -.44], [.99, 1, .12], COLORS.white);
       add('base-grille', [0, .075, 0], [1, .15, 1], COLORS.dark);
-      add('header', [0, .95, 0], [1, .1, 1], COLORS.trim);
+      // Cutaway roof keeps chilled stock visible from the operational overview.
+      add('header', [0, .95, .455], [1, .1, .08], COLORS.white);
       for (const x of [-.485, .485]) add(`side-${x}`, [x, .5, 0], [.03, .85, .98], COLORS.metal);
       for (let level = 0; level < 3; level++) {
         const y = .22 + level * .22;
