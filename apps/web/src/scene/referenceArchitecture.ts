@@ -113,6 +113,32 @@ export function buildReferenceArchitecture(fixtures: readonly Fixture[] = []): A
   }
   group();
   for (let i = 0; i < 3; i++) add(`entry-paving-${i}`, [-22.5, .006, 46 + i * 1.4], [12.6, .012, .06], '#b9b5a6');
+  // Small planted edge pockets frame, rather than narrow, the central entrance approach.
+  for (const [index, x] of [-35.5, -10.8].entries()) {
+    group();
+    add(`entry-planter-${index}-base`, [x, .35, 47.5], [1.2, .7, 2.3], '#d3cdb9');
+    add(`entry-planter-${index}-green`, [x, .85, 47.5], [1.1, .7, 2.1], '#57764b', { primitive: 'sphere' });
+  }
+  // Static reference sign supports, not queue state or business identifier reassignment.
+  // The UI supplies 01–24 text; no external fonts, logos or additional draw-call groups.
+  const checkoutZones = new Set(['zone-checkout_n', 'zone-checkout_e', 'zone-checkout_s']);
+  const lanes = fixtures.filter((f) => checkoutZones.has(f.zoneId)).slice().sort((a,b) => a.x-b.x);
+  lanes.forEach((f, index) => {
+    group();
+    const id = `checkout-accessory-${index + 1}`;
+    add(`${id}-number-board`, [f.x, 2.3, 35.2], [1.4, .1, .8], '#2e6455');
+    add(`${id}-sign-post`, [f.x, 1.1, 35.2], [.07, 2.2, .07], steel);
+    add(`${id}-sign-foot`, [f.x, .045, 35.2], [.32, .09, .32], dark);
+  });
+  // Short impulse tables occupy the checkout band's front edge, not the z[29,34] cross aisle.
+  // They are generic decorative product blocks, never priced stock or operational fixtures.
+  if (lanes.length === 24) for (let index = 0; index < 6; index++) {
+    group();
+    const x = 2.5 + index * 10.7;
+    add(`checkout-accessory-display-${index}-base`, [x, .45, 34.6], [3.2, .9, .7], '#c9b78e');
+    add(`checkout-accessory-display-${index}-top`, [x, .96, 34.6], [3.3, .12, .8], '#eee5cc');
+    for (let box = 0; box < 4; box++) add(`checkout-accessory-display-${index}-pack-${box}`, [x - 1.12 + box * .75, 1.2, 34.6], [.58, .36, .5], box % 2 ? '#b29456' : '#8caa8b');
+  }
   const occupied: OBB[] = fixtures.map((f) => ({ cx: f.x, cz: f.z, ux: Math.cos(f.rotationY), uz: -Math.sin(f.rotationY), hl: f.widthM / 2, hw: f.depthM / 2 }));
   return clusters.filter((cluster) => !cluster.some((p) => occupied.some((f) => obbsOverlap({ cx: p.position[0], cz: p.position[2], ux: 1, uz: 0, hl: p.size[0] / 2, hw: p.size[2] / 2 }, f)))).flat();
 }
