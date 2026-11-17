@@ -5,9 +5,37 @@ import * as THREE from 'three';
 import type { Fixture, StoreLayout } from '@yh/contracts';
 import { buildFixtureDetail, type DetailPart } from './detailGeometry';
 import { buildStoreArchitecture, type ArchitecturePart } from './storeArchitecture';
+import { buildSurfacePixels, type SurfaceKind } from './materialSurface';
 
 interface Instance { part: DetailPart; fixture: Fixture }
 const MATERIALS = ['metal', 'wood', 'glass', 'product', 'label', 'rubber'] as const;
+
+
+/** Shared per batch, not per item; no extra meshes, materials or draw calls. */
+function useSurfaceMaps(kind: SurfaceKind | undefined) {
+  const maps = useMemo(() => {
+    if (kind === undefined) return undefined;
+    const pixels = buildSurfacePixels(kind);
+    const make = (bytes: Uint8Array, srgb: boolean): THREE.DataTexture => {
+      const texture = new THREE.DataTexture(bytes, pixels.width, pixels.height, THREE.RGBAFormat);
+      texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.generateMipmaps = true;
+      texture.needsUpdate = true;
+      return texture;
+    };
+    return { color: make(pixels.color, true), roughness: make(pixels.roughness, false), bump: make(pixels.heightMap, false) };
+  }, [kind]);
+  useEffect(() => {
+    if (maps === undefined) return;
+    // Effect replay can reuse the CPU arrays after a renderer has released its GPU copies.
+    for (const texture of Object.values(maps)) texture.needsUpdate = true;
+    return () => { for (const texture of Object.values(maps)) texture.dispose(); };
+  }, [maps]);
+  return maps;
+}
 
 function Batch({ instances, primitive, material, onSelect }: {
   instances: Instance[];
@@ -16,6 +44,8 @@ function Batch({ instances, primitive, material, onSelect }: {
   onSelect: (id: string) => void;
 }) {
   const ref = useRef<THREE.InstancedMesh>(null);
+  const surfaceKind: SurfaceKind | undefined = material === 'wood' ? 'wood' : material === 'metal' ? 'brushedMetal' : material === 'product' ? (primitive === 'sphere' ? 'produce' : 'packaging') : undefined;
+  const surface = useSurfaceMaps(surfaceKind);
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (mesh === null) return;
@@ -45,8 +75,12 @@ function Batch({ instances, primitive, material, onSelect }: {
     <instancedMesh ref={ref} args={[undefined, undefined, instances.length]} castShadow={material !== 'glass'} receiveShadow onPointerDown={click}>
       {primitive === 'box' ? <boxGeometry args={[1, 1, 1]} /> : <sphereGeometry args={[0.5, 8, 6]} />}
       <meshStandardMaterial
-        roughness={material === 'metal' ? 0.4 : material === 'glass' ? 0.18 : 0.78}
-        metalness={material === 'metal' ? 0.35 : 0}
+        map={surface?.color ?? null}
+        roughnessMap={surface?.roughness ?? null}
+        bumpMap={surface?.bump ?? null}
+        bumpScale={material === 'wood' ? .012 : material === 'metal' ? .002 : .003}
+        roughness={surface ? 1 : material === 'glass' ? .18 : .78}
+        metalness={material === 'metal' ? .48 : 0}
         transparent={material === 'glass'} opacity={material === 'glass' ? 0.25 : 1}
         depthWrite={material !== 'glass'}
       />
