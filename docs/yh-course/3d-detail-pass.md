@@ -100,3 +100,28 @@ Still visibly short of the reference: no photoreal scanned/PBR assets, category-
 验证：0实体重叠、0越界、0超所属语义分区、最小设施间距1m；后勤装饰与150设施逐项OBB审查通过。全量typecheck、根509项、Web3项通过；构建通过。实际Firefox俯视发现初版两个冷库标签重叠、取景偏远，已缩短标签并调整相机再次验收。通道可达、真实收银流程、消防及商业效果仍未验证。
 
 首次进入参考候选还发现F01标签漏显，手动隐藏再显示可恢复。已改为相机稳定后挂载参考DOM标签，并提供标签层级缺省值；Firefox整页刷新后首次进入候选，F01–F12均显示，不再需要手动切换。保留按需渲染，不新增常驻动画循环。
+
+## Reference alignment density pass (2026-11-17)
+
+The supplied 130×100 m concept drawing was compared directly with the previous Firefox top view. The previous pass got the macro-department positions right but was visibly too sparse. This pass keeps the original 150 operational fixture IDs and 17 zone IDs. It does not change the baseline or assert a surveyed reconstruction.
+
+| Area | Observed previous mismatch | This pass | Remaining difference |
+| --- | --- | --- | --- |
+| F01 produce | Repetitive 3-column grid versus irregular islands and perimeter produce | Position retained | Diagonal islands and perimeter produce still need tracing |
+| F02 service / entry | Thin one-sided desk and sparse carts | U-shaped service desk, entrance side glazing, 60 nested cart representations | Cart count is illustrative, not an exact image count; door details are inferred |
+| F03 seafood / F04 meat | Uniform rows lacked perimeter counters | Disconnected U-shaped perimeter counters plus islands | Reference bevels/angled ends remain simplified |
+| F05 deli | Sparse regular islands | Position retained | Perimeter counters and staggered cooking islands remain simplified |
+| F06 frozen | Two sparse horizontal rows | Four long rear counters, four horizontal and four vertical islands | Exact door/bay count not traced |
+| F07 bakery | Repetitive small islands | Position retained | Reference baking perimeter and clustered tables still simplified |
+| F08 dairy | Only three horizontal counters | Seven horizontal plus one east vertical counter | Five are visual-only, not operational fixtures |
+| F09 food | Upper six sparse rows and three short lower columns | Fourteen rows with mixed lengths; 69 visible shelves, lower-left cutout for F10 | 27 visual-only shelves; boundaries and counts are image-inferred, not an exact inventory |
+| F10 drinks | North-south rows already present | Six rows retained | Endcaps, bottle pattern and exact segmentation remain simplified |
+| F11 household | Thirteen sparse shelves | Thirty visible shelves in ten rows | 17 visual-only; appliance silhouettes still generic |
+| F12 checkouts | Twenty-four correctly placed but simple | Two groups of twelve retained | Queue rails and full accessory/number-sign detail remain incomplete |
+| Northern back-of-house | Only sparse small racks and four giant business cabinets | Four trucks retained, 14 racks in two rows around preserved business cabinets | Centre cabinets retain their semantic type; internal room details inferred |
+
+`buildReferenceDisplayFixtures` creates 49 isolated visual fixture skins with `reference-display-` IDs, no categories and no capacity. These are never appended to StoreLayout, snapshot, inventory, simulator or selection. They share existing instancing batches. Clicking them stops propagation without selecting an object behind them. The review panel discloses their decorative status. Combined business and display geometry is checked for store bounds and at least 1 m pairwise clearance; this is not an accessibility, fire-code or actual customer-path certification.
+
+The user also reported the store looking too small. The physical envelope remains 130×100 m, matching the supplied approximate dimensions. A reversible “专注模型 / 返回工作台” view hides rather than unmounts the assistant. Responsive top-camera fitting uses the actual canvas size, reserves UI margins, and re-fits when the split/window changes, avoiding clipping on tall/narrow canvases. It does not scale business geometry or fabricate additional area.
+
+Validation for this pass: `npm run check` passed (55 root test files / 512 tests plus 3 web tests), web production build passed; bundle-size warning remains. Actual cloud Firefox showed the full candidate in the normal split, then a larger full-width focused view, and restored the split without losing the candidate. The first resize attempt exposed side cropping, which was fixed by the responsive fitting above before final capture. The final 1364×1024 Firefox screenshot was saved on 2026-11-17 at 00:28:30 UTC. All F01–F12 labels and store boundaries are visible. Increased middle/east shelf density is visible; left-side produce/deli/bakery still look more repetitive and sparse than the source. No photorealistic or exact-quantity reconstruction is claimed. No frame-rate/performance benchmark was run.
