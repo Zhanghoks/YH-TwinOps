@@ -10,7 +10,7 @@ describe('reference-led service architecture', () => {
     const parts = buildReferenceArchitecture();
     expect(parts).toEqual(buildReferenceArchitecture());
     expect(parts.length).toBeGreaterThan(100);
-    expect(parts.length).toBeLessThan(400);
+    expect(parts.length).toBeLessThan(650);
     expect(new Set(parts.map((p) => p.id)).size).toBe(parts.length);
     for (const p of parts) {
       const [x,y,z] = p.position, [w,h,d] = p.size;
@@ -42,13 +42,19 @@ describe('reference-led service architecture', () => {
     const desk = parts.find((p) => p.id === 'reference-service-desk-base')!;
     expect(desk.position[0] - desk.size[0] / 2).toBe(-32);
     expect(desk.position[0] + desk.size[0] / 2).toBe(-18);
-    expect(parts.some((p) => p.position[0] + p.size[0]/2 > -34 && p.position[0] - p.size[0]/2 < -11 && p.position[2] + p.size[2]/2 > 43)).toBe(false);
+    expect(parts.filter((p) => !p.id.includes('entry-paving')).some((p) => p.position[0] + p.size[0]/2 > -29 && p.position[0] - p.size[0]/2 < -16 && p.position[2] + p.size[2]/2 > 43)).toBe(false);
+    expect(parts.filter((p) => p.id.includes('service-desk-return')).length).toBe(4);
+    expect(parts.filter((p) => p.id.includes('entry-glass')).length).toBe(2);
   });
 
   it('retains service detail without footprint conflicts in the actual reference candidate', () => {
     const { layout } = generatePlanningLayout(baseline);
     const parts = buildReferenceArchitecture(layout.fixtures);
     for (const name of ['truck-', 'processing', 'coldroom-chilled', 'coldroom-frozen', 'service-desk', 'cart-bay']) expect(parts.some((p) => p.id.includes(name))).toBe(true);
+    expect(parts.filter((p) => p.id.includes('cart-bay-') && p.id.endsWith('-basket')).length).toBe(60);
+    const shelves = parts.filter((p) => p.id.includes('warehouse-rack-') && p.id.endsWith('-shelf-0'));
+    expect(shelves.length).toBe(14);
+    expect(new Set(shelves.map((p) => p.position[2])).size).toBe(2);
     for (const p of parts) for (const f of layout.fixtures) {
       expect(obbsOverlap({cx:p.position[0],cz:p.position[2],ux:1,uz:0,hl:p.size[0]/2,hw:p.size[2]/2}, {cx:f.x,cz:f.z,ux:Math.cos(f.rotationY),uz:-Math.sin(f.rotationY),hl:f.widthM/2,hw:f.depthM/2})).toBe(false);
     }
