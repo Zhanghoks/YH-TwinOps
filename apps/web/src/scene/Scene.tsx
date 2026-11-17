@@ -1,3 +1,4 @@
+import { buildReferenceCheckoutSigns } from './referenceSignage';
 import { REFERENCE_SERVICE_LABELS } from './referenceArchitecture';
 import { buildReferenceDisplayFixtures, type ReferenceRegion } from './planningLayout';
 /** StoreLayout-driven single-canvas scene; procedural detail never changes business geometry. */
@@ -323,7 +324,8 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
   const colors = layerColors(layer);
   const shellMode = mode === 'shell' && manifest.shellUrl !== undefined;
   const detailed = mode === 'detail';
-  // These 49 image-inferred shelves are visual skins only; never enter snapshot or selection.
+  // These image-inferred shelves are visual skins only; never enter snapshot or selection.
+  const checkoutSigns = useMemo(() => referenceRegions ? buildReferenceCheckoutSigns(layout.fixtures) : [], [layout, referenceRegions]);
   const referenceDisplays = useMemo(() => referenceRegions ? buildReferenceDisplayFixtures(layout) : [], [layout, referenceRegions]);
   const zoneById = useMemo(() => Object.fromEntries(Object.values(snapshot.zones).map((z) => [z.zoneId, z])), [snapshot]);
 
@@ -378,6 +380,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
       </>}
 
       <ReadyLabels>
+      {referenceRegions && showLabels && layer === 'none' && checkoutSigns.map((sign) => <Html wrapperClass="reference-html-anchor" key={`sign-${sign.fixtureId}`} position={sign.position} center zIndexRange={[8,0]}><span className="reference-checkout-number" aria-label={`图示收银通道 ${sign.text}，非业务编号`}>{sign.text}</span></Html>)}
       {referenceRegions && showLabels && layer === 'none' && referenceRegions.filter((region) => region.code !== 'BACK').map((region) => <Html wrapperClass="reference-html-anchor" key={region.code} position={[(region.bounds.x0 + region.bounds.x1) / 2, 3, (region.bounds.z0 + region.bounds.z1) / 2]} center zIndexRange={[10, 0]}>
         <div className="zone-label reference-label"><strong>{region.label}</strong><span>{region.code === 'BACK' ? '参考图后勤带' : region.code} · 图面分区</span></div>
       </Html>)}
