@@ -43,6 +43,14 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
   if (![f.widthM, f.depthM, f.heightM].every((n) => Number.isFinite(n) && n > 0)) {
     throw new RangeError('Fixture dimensions must be finite and positive');
   }
+  if (f.fixtureType === 'FREEZER' && f.zoneId === 'zone-beverages' && f.depthM > f.widthM * 2) {
+    // Narrow image-candidate presentation only: open bottle merchandising, not an
+    // equipment-type assertion. The source remains FREEZER; no business fields are changed.
+    // Build along the long axis, then swap local axes back inside the original envelope.
+    return buildFixtureDetail({ ...f, fixtureType: 'GONDOLA', widthM: f.depthM, depthM: f.widthM }).map((p) => ({
+      ...p, position: [p.position[2], p.position[1], p.position[0]], size: [p.size[2], p.size[1], p.size[0]],
+    }));
+  }
   const parts: DetailPart[] = [];
   const hash = [...f.fixtureId].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
   const colorAt = (colors: string[], i: number): string => colors[(hash + i) % colors.length] ?? COLORS.white;
@@ -163,19 +171,28 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
       break;
     }
     case 'CHECKOUT': {
-      add('counter-base', [0, .33, 0], [.96, .66, .82], COLORS.white);
-      add('toe-kick', [0, .04, 0], [.9, .08, .75], COLORS.dark);
-      add('counter-edge', [0, .67, 0], [1, .045, .98], COLORS.metal);
-      add('belt', [-.18, .699, 0], [.55, .013, .72], COLORS.belt, 'rubber');
-      for (const z of [-.39, .39]) add(`belt-rail-${z}`, [-.18, .72, z], [.56, .055, .025], COLORS.metal);
-      add('scanner', [.16, .704, 0], [.1, .018, .35], '#263e45', 'glass');
-      add('bagging-tray', [.34, .70, .06], [.22, .02, .7], COLORS.dark);
-      add('pos-stem', [.1, .79, -.31], [.03, .18, .04], COLORS.dark);
-      add('pos-screen-frame', [.1, .91, -.31], [.17, .18, .06], COLORS.dark);
-      add('pos-screen', [.1, .91, -.274], [.14, .14, .009], '#6eada7', 'glass');
-      add('card-reader', [.24, .76, .32], [.08, .09, .1], COLORS.dark);
-      add('belt-item-a', [-.3, .77, -.11], [.1, .13, .22], colorAt(PACKS, 1), 'product');
-      add('belt-item-b', [-.14, .75, .13], [.08, .09, .16], colorAt(PACKS, 2), 'product');
+      // Construct along the footprint's long axis, without rotating the business fixture.
+      // Wide counters retain their original local geometry and every semantic part ID.
+      const longitudinal = f.depthM > f.widthM;
+      const screenSpan = longitudinal ? Math.min(.17, .42 / f.depthM) : .17;
+      const checkoutAdd: typeof add = (id, position, size, color, material, primitive) => {
+        if (longitudinal) {
+          add(id, [position[2], position[1], position[0]], [size[2], size[1], size[0]], color, material, primitive);
+        } else add(id, position, size, color, material, primitive);
+      };
+      checkoutAdd('counter-base', [0, .33, 0], [.96, .66, .82], COLORS.white);
+      checkoutAdd('toe-kick', [0, .04, 0], [.9, .08, .75], COLORS.dark);
+      checkoutAdd('counter-edge', [0, .67, 0], [1, .045, .98], COLORS.metal);
+      checkoutAdd('belt', [-.18, .699, 0], [.55, .013, .72], COLORS.belt, 'rubber');
+      for (const z of [-.39, .39]) checkoutAdd(`belt-rail-${z}`, [-.18, .72, z], [.56, .055, .025], COLORS.metal);
+      checkoutAdd('scanner', [.16, .704, 0], [.1, .018, .35], '#263e45', 'glass');
+      checkoutAdd('bagging-tray', [.34, .70, .06], [.22, .02, .7], COLORS.dark);
+      checkoutAdd('pos-stem', [.1, .79, -.31], [.03, .18, .04], COLORS.dark);
+      checkoutAdd('pos-screen-frame', [.1, .91, -.31], [screenSpan, .18, .06], COLORS.dark);
+      checkoutAdd('pos-screen', [.1, .91, -.274], [longitudinal ? screenSpan * 14 / 17 : .14, .14, .009], '#6eada7', 'glass');
+      checkoutAdd('card-reader', [.24, .76, .32], [.08, .09, .1], COLORS.dark);
+      checkoutAdd('belt-item-a', [-.3, .77, -.11], [.1, .13, .22], colorAt(PACKS, 1), 'product');
+      checkoutAdd('belt-item-b', [-.14, .75, .13], [.08, .09, .16], colorAt(PACKS, 2), 'product');
       break;
     }
     case 'DELI_COUNTER': {
