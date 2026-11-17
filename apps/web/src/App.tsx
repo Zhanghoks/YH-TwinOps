@@ -8,7 +8,7 @@ import { Resizable, ResizableHandle, ResizablePanel } from '@ui-sdk/react/resiza
 import { INJECT_LABELS } from './synthetic';
 import { DEMO_AT, layout as baselineLayout } from './data';
 import { auditStoreLayout } from './scene/layoutAudit';
-import { generatePlanningLayout } from './scene/planningLayout';
+import { generatePlanningLayout, buildReferenceDisplayFixtures } from './scene/planningLayout';
 import { useWorkbench, type ViewLayer } from './state';
 import { createApprovalsClient, fetchAgentStatus, type ApprovalsClient } from './api';
 import { SceneBoundary } from './scene/SceneBoundary';
@@ -75,6 +75,7 @@ export function App(): React.JSX.Element {
   const planningResult = useMemo(() => {
     try { return generatePlanningLayout(baselineLayout); } catch { return null; }
   }, []);
+  const referenceDisplayCount = useMemo(() => planningResult ? buildReferenceDisplayFixtures(planningResult.layout).length : 0, [planningResult]);
   const layout = planning && planningResult ? planningResult.layout : baselineLayout;
   const layoutAudit = useMemo(() => auditStoreLayout(layout), [layout]);
   const baselineAudit = useMemo(() => auditStoreLayout(baselineLayout), []);
@@ -164,7 +165,7 @@ export function App(): React.JSX.Element {
               <dl><dt>实体重叠 / 越门店界</dt><dd>{layoutAudit.overlapPairs.length} / {layoutAudit.outsideStoreIds.length}</dd>
                 <dt>近邻间隙小于 1 m</dt><dd>{layoutAudit.narrowGaps.length} 对（基线 {baselineAudit.narrowGaps.length}）</dd>
                 <dt>设施超出所属语义分区</dt><dd>{layoutAudit.outsideZoneFixtureIds.length} 个（基线 {baselineAudit.outsideZoneFixtureIds.length}）</dd></dl>
-              {planning && planningResult && <p>重排 {planningResult.report.movedFixtureCount} 个设施；{planningResult.report.dimensionChangedFixtureCount} 个尺寸按图近似。设施 ID 与数据关联保留。另有 49 个按图补充陈列，仅作装饰，不可选中，不参与库存或仿真。</p>}
+              {planning && planningResult && <p>重排 {planningResult.report.movedFixtureCount} 个设施；{planningResult.report.dimensionChangedFixtureCount} 个尺寸按图近似。设施 ID 与数据关联保留。另有 {referenceDisplayCount} 个按图补充陈列，仅作装饰，不可选中，不参与库存或仿真。</p>}
               {reviewedGaps.map((gap) => <button className="gap-row" type="button" key={gap.fixtureIds.join('-')} onClick={() => select({kind: 'fixture', id: gap.fixtureIds[0]})}>{gap.fixtureIds.join(' / ')}：{gap.gapM.toFixed(2)} m · 定位</button>)}
               <p className="layout-review-caution">近邻间隙不等于通道净宽。参考图非施工图，面积表与总计不一致；采用图面方向和相对位置，未实测。未验证消防或客流，数据不是候选仿真结果。</p>
             </section>}
