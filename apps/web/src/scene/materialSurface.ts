@@ -1,5 +1,5 @@
 /** Tiny original greyscale multipliers, never real packaging, brand artwork or product data. */
-export const SURFACE_KINDS = ['wood', 'brushedMetal', 'packaging', 'produce'] as const;
+export const SURFACE_KINDS = ['wood', 'brushedMetal', 'packaging', 'produce', 'floorTile'] as const;
 export type SurfaceKind = typeof SURFACE_KINDS[number];
 export interface SurfacePixels {
   width: number;
@@ -43,6 +43,11 @@ export function buildSurfacePixels(kind: SurfaceKind, size = 64): SurfacePixels 
       color = abstractMark ? 180 : label ? 250 : stripe ? 204 : 224 + n * 8;
       roughness = label ? 178 + n * 12 : 117 + n * 18;
       height = label ? 133 : 128;
+    } else if (kind === 'floorTile') {
+      const grout = x === 0 || y === 0;
+      color = grout ? 204 : 245 + n * 8;
+      roughness = grout ? 228 : 168 + n * 16;
+      height = grout ? 100 : 128 + n * 2;
     } else {
       color = 242 + n * 12;
       roughness = 156 + n * 35;
