@@ -31,7 +31,16 @@ Use the workbench at http://localhost:5174, not the older simulator started by t
 
 ## Remaining acceptance work
 
-The cloud test environment denied Chromium's Unix socket creation (`socket() failed: Operation not permitted`), including the approved retry. Therefore screenshot review, actual WebGL picking, transparency/shadow appearance and GPU/FPS measurement remain **not verified**. Run the browser acceptance checklist before merging:
+The initial sandbox-launched Chromium could not create Unix sockets; the app-managed Chrome also reported WebGL disabled. A later cloud-only acceptance run installed the official Mozilla Firefox binary and used its default sandbox/rendering configuration. No unsafe graphics flags, sandbox disabling, Mac access or production deployment were used.
+
+Verified in the running production build:
+- The detailed 3D store actually renders in Firefox. Full-store, top-down and close-up screenshots were captured and delivered.
+- Overview/top-view reset, zoom and hiding zone labels work.
+- Clicking a detailed shelf highlights it and shows its original fixture ID `F049` and GONDOLA metadata in the operations panel.
+- A WebGL initialization failure now remains inside a scene error boundary; operations and alerts remain usable (also covered by a regression test).
+- The detail floor and base ground plane were coplanar. The base plane is now lowered in detail mode; the rebuilt close-up was inspected. Thin floor joints still alias at distance and need further visual polish.
+
+Visual judgment: this is an improved procedural low-poly operations model, **not a photorealistic store**. Repeated fixtures/products, overly uniform dark shelf tops, sparse lighting/signage and default label overlap remain visible. GPU/FPS measurements, all fixture picking variants and the full acceptance matrix below are still not verified. Continue review before merging:
 
 1. Inspect full-store and close-up views in detail, original shell and white modes.
 2. Click shelf products, produce, checkout and freezer parts; confirm facility details retain original IDs.
