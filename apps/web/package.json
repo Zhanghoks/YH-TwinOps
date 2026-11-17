@@ -24,7 +24,8 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "three": "0.170.0",
-    "zustand": "5.0.2"
+    "zustand": "5.0.2",
+    "@storewright/overlap-audit": "0.1.0"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.2",
