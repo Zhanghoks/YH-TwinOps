@@ -1,5 +1,6 @@
 /** StoreLayout-driven single-canvas scene; procedural detail never changes business geometry. */
 import { Suspense, useMemo } from 'react';
+import { buildSceneCamera, type CameraView } from './sceneCamera';
 import { DetailedFixtures, StoreEnvelope } from './DetailedStore';
 import * as THREE from 'three';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
@@ -279,7 +280,7 @@ function ZoneNode({
   );
 }
 
-export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: 'overview' | 'top'; cameraRevision?: number; showLabels?: boolean }) {
+export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number] }) {
   const layer = useWorkbench((s) => s.layer);
   const selection = useWorkbench((s) => s.selection);
   const select = useWorkbench((s) => s.select);
@@ -303,20 +304,22 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
 
   // 布局坐标为居中原点（老概念店坐标系）或角点坐标系（生成布局）：地面中心随之取齐。
   const groundCenter = useMemo(() => {
+    if (fixedCenter) return fixedCenter;
     const rects = [...zoneRects.values()];
     if (rects.length === 0) return [layout.widthM / 2, layout.depthM / 2] as const;
     const xs = rects.flatMap((r) => [r[0], r[2]]);
     const zs = rects.flatMap((r) => [r[1], r[3]]);
     return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2] as const;
-  }, [zoneRects, layout]);
+  }, [zoneRects, layout, fixedCenter]);
 
+  const camera = buildSceneCamera(cameraView, groundCenter, layout.depthM);
   return (
-    <Canvas key={`${cameraView}-${cameraRevision}`} shadows frameloop="demand" camera={{ position: cameraView === 'top' ? [groundCenter[0], 115, groundCenter[1] + 0.1] : [groundCenter[0] + 48, 64, groundCenter[1] + 78], fov: 42 }} dpr={[1, 1.5]}>
+    <Canvas key={`${cameraView}-${cameraRevision}`} shadows frameloop="demand" camera={{ position: camera.position, fov: 42 }} dpr={[1, 1.5]}>
       <color attach="background" args={['#e8eceb']} />
       {/* shell 模型自带较暗的烘焙色调，光照对齐老原型的强度口径 */}
-      <hemisphereLight args={['#e5fff0', '#34413e', shellMode ? 2.1 : 1.5]} />
-      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.2} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
-      <OrbitControls target={[groundCenter[0], 0, groundCenter[1]]} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={220} />
+      <hemisphereLight args={[shellMode ? '#e5fff0' : '#fff3d9', shellMode ? '#34413e' : '#56615c', shellMode ? 2.1 : 1.05]} />
+      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.65} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
+      <OrbitControls target={camera.target} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={220} />
 
       {/* 地面（白膜模式）与取消选择热区 */}
       <mesh position={[groundCenter[0], detailed ? -0.04 : -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
