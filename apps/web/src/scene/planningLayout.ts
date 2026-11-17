@@ -95,17 +95,17 @@ function customSlots(zoneId: string): DisplaySlot[] | undefined {
     ...Array.from({ length: 12 }, (_, i) => {
       const row = Math.floor(i / 3), col = i % 3;
       return slot([-51,-41,-32.5][col]! + row % 2 * .4, 7 + row * 7,
-        [6,6.8,4.6][col]! - row % 2 * .4, row % 2 ? 3.2 : 2.6);
+        [7,7.8,5.2][col]! - row % 2 * .4, row === 3 ? 3.2 : row % 2 ? 4.8 : 4.4);
     }),
     ...[8,17,26].map((z) => slot(-59,z,6,2,Math.PI/3)),
   ];
   if (zoneId === 'zone-deli') return [slot(-60,-4,8,1.6,Math.PI/2),slot(-51,-9,12,1.6),
     slot(-50,.8,14,1.6),slot(-49,-4,9,1.8),slot(-29,-4,8,1.6,Math.PI/2),slot(-35,-9,7,1.6)];
   if (zoneId === 'zone-bakery') return [
-    ...[34,40].map((x) => slot(x,-29,4,1)),
-    ...[32,42].flatMap((x) => [-25,-21].map((z) => slot(x,z,2,1,Math.PI/2))),
-    ...[-25,-21].map((z) => slot(37,z,5,1.5)),
-    ...[34,40].flatMap((x) => [-17,-14].map((z) => slot(x,z,4,1))),
+    ...[34,40].map((x) => slot(x,-29,4.8,1.4)),
+    ...[32,42].flatMap((x) => [-25,-21].map((z) => slot(x,z,3,1,Math.PI/2))),
+    ...[-25,-21].map((z) => slot(37,z,5.8,2.2)),
+    ...[34,40].flatMap((x) => [-17,-14].map((z) => slot(x,z,4.8,1.4))),
   ];
   if (['zone-packaged','zone-bulk','zone-featured'].includes(zoneId)) return foodSlots().filter((s) => s.zoneId === zoneId && !s.decorative).map((s) => s.slot);
   if (zoneId === 'zone-household') return householdSlots().filter((_, i) => HOUSEHOLD_BUSINESS_INDICES.has(i));
@@ -133,6 +133,9 @@ export function buildReferenceDisplayFixtures(layout: StoreLayout): Fixture[] {
     { zoneId: 'zone-produce', slot: slot(-36,31.5,8,1) },
     { zoneId: 'zone-deli', slot: slot(-36,-4,5,1.8) },
     { zoneId: 'zone-deli', slot: slot(-36,.8,5,1.6) },
+    // Eastern perimeter runs close the fresh-food silhouettes, with service gaps retained.
+    { zoneId: 'zone-seafood', slot: slot(-45,-21.5,10,1.6,Math.PI/2) },
+    { zoneId: 'zone-meat', slot: slot(-26,-21.5,10,1.6,Math.PI/2) },
   ];
   const displays = descriptors.map((d,i) => {
     const template = layout.fixtures.find((f) => f.zoneId === d.zoneId);
@@ -217,7 +220,7 @@ export function generatePlanningLayout(source: StoreLayout): { layout: StoreLayo
       '候选设施尺寸及位置按图推定，完整尺寸差异列于 changes；原高度保留，fixed 设施移动仅供预览，需人工复核。',
       'F09 食品百货包含原 packaged/bulk/featured；F02 客服入口包含原 rest，未新建经营类别。',
       '24 台收银南侧靠右单横排，两组各 12 台，台长南北向；客服入口在南侧左方，仅为空间假设。',
-      'F09 按图近似 14 排、6 个不同架长的列，下段让出酒水；42 个业务架外补 27 个纯视觉架，乳品另补 5 柜，日化补 17 架，果蔬前缘补 2 台、熟食补 2 台；共 53 个装饰，不进入库存/业务状态。',
+      'F09 按图近似 14 排、6 个不同架长的列，下段让出酒水；42 个业务架外补 27 个纯视觉架，乳品另补 5 柜，日化补 17 架，果蔬前缘补 2 台、熟食补 2 台；水产/鲜肉东侧各补 1 柜；共 55 个装饰，不进入库存/业务状态。',
       '果蔬采用错列岛台与西侧斜柜，熟食/烘焙采用围合柜与中岛；这些形态是图示近似，补充陈列数量不声称等于原图精确数量。',
       '图片小字、准确货架数量、商品、门窗、消防疏散、加工冷库内部接驳无法可靠辨认；150 个代表设施并非逐件复刻图中物体。',
       '区域锚点为粗略语义范围，F09 外包范围与西南酒水范围部分交叠，但其实际设施分开布置；zone polygons 依实际设施包围区更新。',
