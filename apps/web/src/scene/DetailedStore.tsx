@@ -1,9 +1,10 @@
 /** Original procedural teaching assets: geometry is a skin, StoreLayout remains authoritative. */
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Fixture, StoreLayout } from '@yh/contracts';
 import { buildFixtureDetail, type DetailPart } from './detailGeometry';
+import { buildStoreArchitecture, type ArchitecturePart } from './storeArchitecture';
 
 interface Instance { part: DetailPart; fixture: Fixture }
 const MATERIALS = ['metal', 'wood', 'glass', 'product', 'label', 'rubber'] as const;
@@ -74,35 +75,71 @@ export function DetailedFixtures({ fixtures, selectedId, onSelect }: {
   </group>;
 }
 
-/** Cutaway envelope: no roof or invented columns hiding operational information. */
+function ArchitectureBatch({ parts, primitive, transparent, emissive }: { parts: ArchitecturePart[]; primitive: 'box' | 'sphere'; transparent: boolean; emissive: boolean }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    const transform = new THREE.Object3D();
+    const color = new THREE.Color();
+    parts.forEach((part, i) => {
+      transform.position.set(...part.position);
+      transform.scale.set(...part.size);
+      transform.updateMatrix();
+      ref.current?.setMatrixAt(i, transform.matrix);
+      ref.current?.setColorAt(i, color.set(part.color));
+    });
+    ref.current.instanceMatrix.needsUpdate = true;
+    if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true;
+    ref.current.computeBoundingSphere();
+  }, [parts]);
+  return <instancedMesh ref={ref} args={[undefined, undefined, parts.length]} castShadow={!transparent && !emissive} receiveShadow={!emissive}>
+    {primitive === 'sphere' ? <sphereGeometry args={[.5, 10, 8]} /> : <boxGeometry args={[1, 1, 1]} />}
+    <meshStandardMaterial roughness={transparent ? .15 : .65} metalness={transparent ? .1 : .12} transparent={transparent} opacity={transparent ? .22 : 1} depthWrite={!transparent} emissive={emissive ? '#ffdca0' : '#000000'} emissiveIntensity={emissive ? .7 : 0} />
+  </instancedMesh>;
+}
+
+/** Perimeter-only architectural context, never added to business collision geometry. */
 export function StoreEnvelope({ layout, center }: { layout: StoreLayout; center: readonly [number, number] }) {
   const w = layout.widthM;
   const d = layout.depthM;
+  const signTexture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#b82d38'; ctx.fillRect(0, 0, 1024, 128);
+      ctx.fillStyle = '#fff8ed'; ctx.font = '600 64px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('YH · 合成教学门店', 512, 64);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }, []);
+  useEffect(() => () => signTexture.dispose(), [signTexture]);
+  const batches = useMemo(() => {
+    const parts = buildStoreArchitecture(w, d);
+    return (['box', 'sphere'] as const).flatMap((primitive) => [false, true].flatMap((transparent) => [false, true].map((emissive) => ({
+      primitive, transparent, emissive,
+      parts: parts.filter((p) => p.primitive === primitive && !!p.transparent === transparent && !!p.emissive === emissive),
+    })))).filter((batch) => batch.parts.length > 0);
+  }, [w, d]);
   return <group position={[center[0], 0, center[1]]}>
-    <mesh position={[0, -0.13, 0]} receiveShadow>
-      <boxGeometry args={[w + 0.6, 0.24, d + 0.6]} /><meshStandardMaterial color="#e7e4da" roughness={0.9} />
+    <mesh position={[0, -.13, 0]} receiveShadow>
+      <boxGeometry args={[w + .6, .24, d + .6]} /><meshStandardMaterial color="#e8e2d3" roughness={.72} />
     </mesh>
-    {/* Tile joints: restrained scale cues without texture downloads. */}
-    {Array.from({ length: Math.floor(w / 2) + 1 }, (_, i) => <mesh key={`x-${i}`} position={[-w / 2 + i * 2, 0.002, 0]}>
-      <boxGeometry args={[0.012, 0.005, d]} /><meshStandardMaterial color="#cecbbf" />
+    {Array.from({ length: Math.floor(w / 2) + 1 }, (_, i) => <mesh key={`x-${i}`} position={[-w / 2 + i * 2, .002, 0]}>
+      <boxGeometry args={[.024, .005, d]} /><meshBasicMaterial color="#ded8cb" />
     </mesh>)}
-    {Array.from({ length: Math.floor(d / 2) + 1 }, (_, i) => <mesh key={`z-${i}`} position={[0, 0.002, -d / 2 + i * 2]}>
-      <boxGeometry args={[w, 0.005, 0.012]} /><meshStandardMaterial color="#cecbbf" />
+    {Array.from({ length: Math.floor(d / 2) + 1 }, (_, i) => <mesh key={`z-${i}`} position={[0, .002, -d / 2 + i * 2]}>
+      <boxGeometry args={[w, .005, .024]} /><meshBasicMaterial color="#ded8cb" />
     </mesh>)}
-    <mesh position={[0, 1.8, -d / 2 - 0.16]} castShadow receiveShadow>
-      <boxGeometry args={[w + 0.6, 3.6, 0.3]} /><meshStandardMaterial color="#d7d4c9" />
+    <mesh position={[0, 1.8, -d / 2 - .45]} receiveShadow>
+      <boxGeometry args={[w + .5, 3.6, .28]} /><meshStandardMaterial color="#e0d8c8" roughness={.8} />
     </mesh>
-    <mesh position={[-w / 2 - 0.16, 0.65, 0]} receiveShadow>
-      <boxGeometry args={[0.3, 1.3, d]} /><meshStandardMaterial color="#d7d4c9" />
+    <mesh position={[0, 2.9, d / 2 + .39]}>
+      <planeGeometry args={[Math.min(w * .45, 18), .82]} /><meshBasicMaterial map={signTexture} toneMapped={false} />
     </mesh>
-    <mesh position={[w / 2 + 0.16, 0.65, 0]} receiveShadow>
-      <boxGeometry args={[0.3, 1.3, d]} /><meshStandardMaterial color="#d7d4c9" />
-    </mesh>
-    <mesh position={[0, 3.15, -d / 2 + 0.01]}>
-      <boxGeometry args={[w, 0.35, 0.08]} /><meshStandardMaterial color="#305e50" />
-    </mesh>
-    <mesh position={[0, 3.45, -d / 2 + 0.05]}>
-      <boxGeometry args={[w - 0.4, 0.05, 0.1]} /><meshStandardMaterial color="#fff5d7" emissive="#fff5d7" emissiveIntensity={0.5} />
-    </mesh>
+    {batches.map((batch) => <ArchitectureBatch key={`${batch.primitive}-${batch.transparent}-${batch.emissive}`} {...batch} />)}
   </group>;
 }
