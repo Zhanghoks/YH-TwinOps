@@ -163,7 +163,7 @@ export function App(): React.JSX.Element {
               <dl><dt>实体重叠 / 越门店界</dt><dd>{layoutAudit.overlapPairs.length} / {layoutAudit.outsideStoreIds.length}</dd>
                 <dt>近邻间隙小于 1 m</dt><dd>{layoutAudit.narrowGaps.length} 对（基线 {baselineAudit.narrowGaps.length}）</dd>
                 <dt>设施超出所属语义分区</dt><dd>{layoutAudit.outsideZoneFixtureIds.length} 个（基线 {baselineAudit.outsideZoneFixtureIds.length}）</dd></dl>
-              {planning && planningResult && <p>重排 {planningResult.report.movedFixtureCount} 个设施；中央预留 {planningResult.report.centralAisleWidthM} m。ID、尺寸与数据关联保留。</p>}
+              {planning && planningResult && <p>重排 {planningResult.report.movedFixtureCount} 个设施；中央预留 {planningResult.report.centralAisleWidthM} m；横向衔接 {planningResult.report.crossAisle.widthM} m（淡绿色规划带）。ID、尺寸与数据关联保留。</p>}
               {reviewedGaps.map((gap) => <button className="gap-row" type="button" key={gap.fixtureIds.join('-')} onClick={() => select({kind: 'fixture', id: gap.fixtureIds[0]})}>{gap.fixtureIds.join(' / ')}：{gap.gapM.toFixed(2)} m · 定位</button>)}
               <p className="layout-review-caution">近邻间隙不等于通道净宽。入口为假设；尚未验证通达、消防、无障碍或客流收益。数据图层不是此候选的仿真结果。</p>
             </section>}
@@ -176,7 +176,7 @@ export function App(): React.JSX.Element {
               <span>拖动旋转 · 滚轮缩放 · 点击设施</span>
             </div>
             <div className="scene-mode-note">{planning && '规划候选 · 未批准 · 数据非候选仿真 · '}{sceneMode === 'detail' ? `合成教学布局 ${layout.widthM}×${layout.depthM} m · 商品为装饰，不代表库存` : sceneMode === 'shell' ? '已登记原始外壳 · 基线未修改' : '布局白膜 · 设施尺寸来自布局数据'}</div>
-            <SceneBoundary><Scene snapshot={snapshot} layout={layout} manifest={manifest} mode={sceneMode} cameraView={cameraView} cameraRevision={cameraRevision} showLabels={showLabels} fixedCenter={planning ? [0, 0] : undefined} /></SceneBoundary>
+            <SceneBoundary><Scene snapshot={snapshot} layout={layout} manifest={manifest} mode={sceneMode} cameraView={cameraView} cameraRevision={cameraRevision} showLabels={showLabels} fixedCenter={planning ? [0, 0] : undefined} planningGuides={planning && planningResult ? { centralWidthM: planningResult.report.centralAisleWidthM, crossZ0: planningResult.report.crossAisle.z0, crossZ1: planningResult.report.crossAisle.z1 } : undefined} /></SceneBoundary>
           </div>
         </ResizablePanel>
 
