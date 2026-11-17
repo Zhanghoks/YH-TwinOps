@@ -68,6 +68,7 @@ export function App(): React.JSX.Element {
   const [cameraView, setCameraView] = useState<'overview' | 'top' | 'entrance'>('overview');
   const [cameraRevision, setCameraRevision] = useState(0);
   const [showLabels, setShowLabels] = useState(true);
+  const [modelFocused, setModelFocused] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [showLayoutReview, setShowLayoutReview] = useState(false);
   const select = useWorkbench((s) => s.select);
@@ -134,7 +135,7 @@ export function App(): React.JSX.Element {
         </div>
       </header>
 
-      <Resizable className="main" autoSaveId="yh-workbench-split">
+      <Resizable className={`main${modelFocused ? ' model-focused' : ''}`} autoSaveId="yh-workbench-split">
         <ResizablePanel id="yh-scene" className="scene-pane" defaultSize={68} minSize={42}>
           <div className="canvas-wrap">
             <div className="layer-bar">
@@ -163,7 +164,7 @@ export function App(): React.JSX.Element {
               <dl><dt>实体重叠 / 越门店界</dt><dd>{layoutAudit.overlapPairs.length} / {layoutAudit.outsideStoreIds.length}</dd>
                 <dt>近邻间隙小于 1 m</dt><dd>{layoutAudit.narrowGaps.length} 对（基线 {baselineAudit.narrowGaps.length}）</dd>
                 <dt>设施超出所属语义分区</dt><dd>{layoutAudit.outsideZoneFixtureIds.length} 个（基线 {baselineAudit.outsideZoneFixtureIds.length}）</dd></dl>
-              {planning && planningResult && <p>重排 {planningResult.report.movedFixtureCount} 个设施；{planningResult.report.dimensionChangedFixtureCount} 个尺寸按图近似。设施 ID 与数据关联保留。</p>}
+              {planning && planningResult && <p>重排 {planningResult.report.movedFixtureCount} 个设施；{planningResult.report.dimensionChangedFixtureCount} 个尺寸按图近似。设施 ID 与数据关联保留。另有 49 个按图补充陈列，仅作装饰，不可选中，不参与库存或仿真。</p>}
               {reviewedGaps.map((gap) => <button className="gap-row" type="button" key={gap.fixtureIds.join('-')} onClick={() => select({kind: 'fixture', id: gap.fixtureIds[0]})}>{gap.fixtureIds.join(' / ')}：{gap.gapM.toFixed(2)} m · 定位</button>)}
               <p className="layout-review-caution">近邻间隙不等于通道净宽。参考图非施工图，面积表与总计不一致；采用图面方向和相对位置，未实测。未验证消防或客流，数据不是候选仿真结果。</p>
             </section>}
@@ -173,6 +174,7 @@ export function App(): React.JSX.Element {
               <button type="button" onClick={() => { setCameraView('entrance'); setCameraRevision((n) => n + 1); }}>入口视角</button>
               <button type="button" aria-pressed={showLabels} onClick={() => setShowLabels((v) => !v)}>{showLabels ? '隐藏分区' : '显示分区'}</button>
               <button type="button" aria-expanded={showLayoutReview} onClick={() => setShowLayoutReview((v) => !v)}>布局检查</button>
+              <button type="button" aria-pressed={modelFocused} onClick={() => setModelFocused((v) => !v)}>{modelFocused ? '返回工作台' : '专注模型'}</button>
               <span>拖动旋转 · 滚轮缩放 · 点击设施</span>
             </div>
             <div className="scene-mode-note">{planning && '按图候选 · 尺寸推定 · 未批准 · 数据非候选仿真 · '}{sceneMode === 'detail' ? `合成教学布局 ${layout.widthM}×${layout.depthM} m · 商品为装饰，不代表库存` : sceneMode === 'shell' ? '已登记原始外壳 · 基线未修改' : '布局白膜 · 设施尺寸来自布局数据'}</div>
