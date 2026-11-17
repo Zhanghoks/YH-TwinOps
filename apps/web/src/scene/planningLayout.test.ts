@@ -52,7 +52,9 @@ describe('image-reference planning candidate', () => {
       const region = report.referenceRegions.find((r) => r.zoneIds.includes(zone.zoneId));
       expect(region).toBeDefined();
       const xs = zone.polygonM!.map((p) => p[0]), zs = zone.polygonM!.map((p) => p[1]);
-      for (const f of layout.fixtures.filter((f) => f.zoneId === zone.zoneId)) {
+      for (const original of layout.fixtures.filter((f) => f.zoneId === zone.zoneId)) {
+        const c = Math.abs(Math.cos(original.rotationY)), sn = Math.abs(Math.sin(original.rotationY));
+        const f = { ...original, widthM: c * original.widthM + sn * original.depthM, depthM: sn * original.widthM + c * original.depthM };
         expect(f.x - f.widthM / 2).toBeGreaterThanOrEqual(Math.max(region!.bounds.x0, Math.min(...xs)) - 1e-8);
         expect(f.x + f.widthM / 2).toBeLessThanOrEqual(Math.min(region!.bounds.x1, Math.max(...xs)) + 1e-8);
         expect(f.z - f.depthM / 2).toBeGreaterThanOrEqual(Math.max(region!.bounds.z0, Math.min(...zs)) - 1e-8);
@@ -81,5 +83,39 @@ describe('image-reference planning candidate', () => {
     const bad = structuredClone(layout);
     bad.fixtures[1]!.x = bad.fixtures[0]!.x; bad.fixtures[1]!.z = bad.fixtures[0]!.z;
     expect(validatePlanningLayout(bad).issues.some((i) => i.includes('间距'))).toBe(true);
+  });
+});
+
+describe('reference merchandising density', () => {
+  it('adds non-business displays and fills 14 mixed-length F09 rows without collisions', async () => {
+    const { buildReferenceDisplayFixtures } = await import('./planningLayout');
+    const { layout } = generatePlanningLayout(baseline);
+    const before = JSON.stringify(layout);
+    const displays = buildReferenceDisplayFixtures(layout);
+    expect(JSON.stringify(layout)).toBe(before);
+    expect(displays).toEqual(buildReferenceDisplayFixtures(layout));
+    expect(displays.every((f) => f.fixtureId.startsWith('reference-display-'))).toBe(true);
+    expect(displays.every((f) => f.categoryIds.length === 0 && f.capacity === undefined)).toBe(true);
+    expect(buildReferenceDisplayFixtures(baseline)).toEqual([]);
+    expect(new Set([...layout.fixtures,...displays].map((f) => f.fixtureId)).size).toBe(150+displays.length);
+    expect(validatePlanningLayout({...layout, fixtures:[...layout.fixtures,...displays]}).issues).toEqual([]);
+    const food = [...layout.fixtures,...displays].filter((f) => ['zone-packaged','zone-bulk','zone-featured'].includes(f.zoneId));
+    expect(food).toHaveLength(69);
+    expect(new Set(food.map((f) => f.z)).size).toBe(14);
+    expect(new Set(food.map((f) => f.widthM)).size).toBeGreaterThanOrEqual(4);
+    expect(displays.filter((f) => f.zoneId === 'zone-daily')).toHaveLength(5);
+    expect([...layout.fixtures,...displays].filter((f) => f.zoneId === 'zone-household')).toHaveLength(30);
+  });
+
+  it('uses perimeter and island arrangements in fresh food and combined freezer orientations', () => {
+    const { layout } = generatePlanningLayout(baseline);
+    for (const zoneId of ['zone-seafood','zone-meat','zone-frozen']) {
+      const fs = layout.fixtures.filter((f) => f.zoneId === zoneId);
+      expect(fs.some((f) => f.rotationY === Math.PI/2)).toBe(true);
+      expect(fs.some((f) => f.rotationY === 0)).toBe(true);
+    }
+    const top = layout.fixtures.filter((f) => f.zoneId === 'zone-frozen' && f.z < -28);
+    expect(top).toHaveLength(4);
+    expect(top.every((f) => f.widthM === 11)).toBe(true);
   });
 });
