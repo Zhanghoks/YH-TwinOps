@@ -3,12 +3,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Fixture, StoreLayout } from '@yh/contracts';
-import { buildFixtureDetail, type DetailPart } from './detailGeometry';
+import { buildFixtureDetail, type DetailPart, type DetailFixtureShape } from './detailGeometry';
 import { buildStoreArchitecture, type ArchitecturePart } from './storeArchitecture';
 import { buildReferenceArchitecture } from './referenceArchitecture';
 import { buildSurfacePixels, type SurfaceKind } from './materialSurface';
 
-interface Instance { part: DetailPart; fixture: Fixture }
+interface Instance { part: DetailPart; fixture: DetailFixtureShape; selectable: boolean }
 const MATERIALS = ['metal', 'wood', 'glass', 'product', 'label', 'rubber'] as const;
 
 
@@ -70,6 +70,7 @@ function Batch({ instances, primitive, material, onSelect }: {
     const instance = event.instanceId === undefined ? undefined : instances[event.instanceId];
     if (instance === undefined) return;
     event.stopPropagation();
+    if (!instance.selectable) return;
     onSelect(instance.fixture.fixtureId);
   };
   return (
@@ -89,15 +90,15 @@ function Batch({ instances, primitive, material, onSelect }: {
   );
 }
 
-export function DetailedFixtures({ fixtures, selectedId, onSelect }: {
-  fixtures: Fixture[]; selectedId?: string; onSelect: (id: string) => void;
+export function DetailedFixtures({ fixtures, decorations = [], selectedId, onSelect }: {
+  fixtures: Fixture[]; decorations?: DetailFixtureShape[]; selectedId?: string; onSelect: (id: string) => void;
 }) {
   const batches = useMemo(() => {
-    const all = fixtures.flatMap((fixture) => buildFixtureDetail(fixture).map((part) => ({ fixture, part })));
+    const all = [...fixtures.flatMap((fixture) => buildFixtureDetail(fixture).map((part) => ({ fixture, part, selectable: true }))), ...decorations.flatMap((fixture) => buildFixtureDetail(fixture).map((part) => ({ fixture, part, selectable: false })))];
     return MATERIALS.flatMap((material) => (['box', 'sphere'] as const).map((primitive) => ({
       material, primitive, instances: all.filter(({ part }) => part.material === material && part.primitive === primitive),
     }))).filter(({ instances }) => instances.length > 0);
-  }, [fixtures]);
+  }, [fixtures, decorations]);
   const selected = fixtures.find((f) => f.fixtureId === selectedId);
   return <group>
     {batches.map((batch) => <Batch key={`${batch.material}-${batch.primitive}`} {...batch} onSelect={onSelect} />)}
