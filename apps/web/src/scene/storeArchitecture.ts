@@ -38,6 +38,40 @@ export function buildStoreArchitecture(width: number, depth: number): Architectu
     add(`${id}-handrail`, [x, 1.23 * scale, front], [bayWidth * .96, .055 * scale, .07 * scale], cream);
     add(`${id}-mullion`, [x - bayWidth * .47, 1.35 * scale, front], [.065 * scale, 2.7 * scale, .08 * scale], dark);
   }
+  // Exterior approach only: decorative paving is flush, with a clear central entry lane.
+  // These are not measured accessibility dimensions and never become navigation colliders.
+  const apronZ = depth / 2 + 3.1 * scale;
+  add('entrance-apron', [0, .025 * scale, apronZ], [width + .8 * scale, .05 * scale, 5.8 * scale], '#c9c3b5');
+  for (let row = 0; row < 5; row++) {
+    add(`entrance-paving-cross-${row}`, [0, .053 * scale, depth / 2 + (1 + row) * scale], [width + .75 * scale, .004 * scale, .018 * scale], '#aaa99c');
+  }
+  const pavingBays = Math.min(24, Math.max(4, Math.ceil(width / 3)));
+  for (let i = 1; i < pavingBays; i++) {
+    add(`entrance-paving-joint-${i}`, [-width / 2 + i * width / pavingBays, .053 * scale, apronZ], [.018 * scale, .004 * scale, 5.75 * scale], '#aaa99c');
+  }
+  for (const side of [-1, 1]) {
+    const planterX = side * width * .36;
+    const planterWidth = Math.min(width * .18, 6);
+    const planterZ = depth / 2 + 4.4 * scale;
+    add(`entrance-planter-${side}`, [planterX, .28 * scale, planterZ], [planterWidth, .56 * scale, 1.15 * scale], '#a99678');
+    add(`entrance-planter-soil-${side}`, [planterX, .57 * scale, planterZ], [planterWidth * .94, .035 * scale, 1.04 * scale], '#4c4f37');
+    for (let i = 0; i < 3; i++) {
+      add(`entrance-planter-shrub-${side}-${i}`, [planterX + (i - 1) * planterWidth * .28, .88 * scale, planterZ], [planterWidth * .31, .76 * scale, .98 * scale], i === 1 ? '#708e46' : '#527a40', { primitive: 'sphere' });
+    }
+    const rackX = side * width * .22;
+    const rackWidth = Math.min(width * .10, 3.8);
+    const rackZ = depth / 2 + 2.2 * scale;
+    // An open steel cart corral, not a solid box or a claim about actual cart inventory.
+    add(`entrance-cart-rack-${side}-base`, [rackX, .08 * scale, rackZ], [rackWidth, .08 * scale, 1.6 * scale], '#9a9e97');
+    for (const edge of [-1, 1]) {
+      for (const end of [-1, 1]) {
+        add(`entrance-cart-rack-${side}-post-${edge}-${end}`, [rackX + edge * rackWidth * .46, .48 * scale, rackZ + end * .73 * scale], [.045 * scale, .8 * scale, .045 * scale], '#78817e');
+      }
+      add(`entrance-cart-rack-${side}-rail-${edge}`, [rackX + edge * rackWidth * .46, .89 * scale, rackZ], [.055 * scale, .055 * scale, 1.55 * scale], '#bcc4bd');
+    }
+    add(`entrance-cart-rack-${side}-back`, [rackX, .89 * scale, rackZ - .73 * scale], [rackWidth * .96, .055 * scale, .055 * scale], '#bcc4bd');
+    add(`entrance-cart-rack-${side}-marker`, [rackX, .8 * scale, rackZ - .74 * scale], [rackWidth * .46, .25 * scale, .035 * scale], '#507264');
+  }
   // Side windows are deliberately waist-height in the cutaway, preserving the operational view.
   const sideBays = Math.min(10, Math.max(3, Math.ceil(depth / 6)));
   const sideLength = depth / sideBays;
