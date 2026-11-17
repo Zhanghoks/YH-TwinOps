@@ -269,9 +269,9 @@ function ZoneNode({
         <planeGeometry args={[x1 - x0, z1 - z0]} />
         <meshBasicMaterial color={fill} transparent opacity={opacity} depthWrite={false} />
       </mesh>
-      {name !== '' && <Html position={[cx, shellMode ? 2.6 : 0.6, cz]} center distanceFactor={55} zIndexRange={[10, 0]}>
-        <div className="zone-label" style={{ pointerEvents: 'none' }}>
-          <strong>{name.split(' / ')[0]}</strong><small>{zone.zoneId.replace('zone-', '')}</small>
+      {name !== '' && <Html position={[cx, shellMode ? 2.6 : 0.6, cz]} center zIndexRange={[10, 0]}>
+        <div className={`zone-label${selected ? ' is-selected' : ''}`} style={{ pointerEvents: 'none' }}>
+          <strong>{name.split(' / ')[0]}</strong>
           {badge !== '' && <span>{badge}</span>}
         </div>
       </Html>}
@@ -315,7 +315,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
       <color attach="background" args={['#e8eceb']} />
       {/* shell 模型自带较暗的烘焙色调，光照对齐老原型的强度口径 */}
       <hemisphereLight args={['#e5fff0', '#34413e', shellMode ? 2.1 : 1.5]} />
-      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.2} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-camera-far={150} shadow-normalBias={0.05} />
+      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.2} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
       <OrbitControls target={[groundCenter[0], 0, groundCenter[1]]} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={220} />
 
       {/* 地面（白膜模式）与取消选择热区 */}
@@ -366,11 +366,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
           />
         ))}
 
-      <Html position={[groundCenter[0] - layout.widthM / 2 + 8, 1, groundCenter[1] + layout.depthM / 2 + 9]} center zIndexRange={[10, 0]}>
-        <div className="store-caption" style={{ pointerEvents: 'none' }}>
-          合成教学压测布局 {layout.widthM}×{layout.depthM} m（非真实门店测量）
-        </div>
-      </Html>
+
     </Canvas>
   );
 }
