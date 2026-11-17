@@ -61,3 +61,14 @@ The owner supplied a rendered supermarket cockpit reference. This is an art-dire
 - Validation: full `npm run check` passed 481 root tests and 3 web tests. After the small second-pass architecture adjustment, 16 geometry/architecture tests, web typecheck and web build passed.
 
 Still visibly short of the reference: no photoreal scanned/PBR assets, category-specific merchandising diversity, populated shopping simulation, believable ceiling services, detailed entrance plaza or measured shop capture. The scene remains a simplified procedural model. No invented live KPIs or fake heatmap population were added just to imitate the image. Screenshot review is not an FPS benchmark or full acceptance of every mode/fixture.
+
+## 第三轮：品类细节、入口与独立规划候选
+
+- 原始布局不变。饮料、包装食品、洗化、散称具有不同的商品形状与配色；当前装饰共 16,857 个实例、7 个批次，不是真实 SKU/库存。
+- 入口增加外部铺装、低花池、购物车围栏和专用入口视角；默认光照调整为温暖中性。不是实测建筑复原。
+- “布局检查”可在原型基线与独立规划候选之间切换，默认仍是基线。候选重排全部 150 个设施，保留 ID、尺寸、fixed 标记及业务元数据，同步 17 个部门的语义 polygon，并禁用基线 GLB 外壳以防错位。
+- 候选预留中央 4m 几何带，收银移至前场，两侧按部门组织。它探索性移动了原型 fixed 设施，尚未批准，不修改源布局或部署资产。
+- 几何检查：基线/候选均无实体重叠、无越店界；小于 1m 的正交近邻间隙 45→0 对；超出所属分区的设施 56→0 个；候选包围盒最小间距 1.2m。近邻间隙不是通道净宽，分区调整也不代表业务收益。
+- 入口位置是假设；未做导航连通性、消防、无障碍、服务排队和人流收益验证。现有合成信号按保留 ID 展示，不是候选布局的仿真结果。切换布局会清空选中设施并关闭数据叠加，底部始终标注候选属性。
+- 云端 Firefox 原生浏览器实际检查入口视角和候选俯视渲染，未操作 Mac。候选主通道与前场明显比基线清楚，但右前部留白较大、收银朝向和真实工作流仍需下一轮细化。材质和重复商品仍属低多边形程序模型，并非参考图那样的照片级场景。
+- 验证：全量 typecheck；根测试 497/497；Web 测试 3/3，包含候选/基线可逆切换、ID 保留、基线外壳禁用；生产构建通过。构建仍有大 chunk 警告（约 1.55MB / gzip453KB），未宣称帧率验收完成。
