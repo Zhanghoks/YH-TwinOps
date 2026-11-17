@@ -20,6 +20,19 @@ const PACKS = ['#b75e48', '#d9ae58', '#729b8c', '#e1d3ac', '#698ba1', '#bc927c']
 // Muted vegetable / apple / citrus shades, avoiding toy-like primary colours.
 const FRUIT = ['#82934c', '#c9943e', '#ac5943', '#587d49', '#bfad67', '#843f37'];
 
+type MerchandisingStyle = 'mixed' | 'beverages' | 'household' | 'packaged' | 'bulk';
+interface MerchandisingTheme { style: MerchandisingStyle; accent: string; panel: string; palette: string[] }
+/** Zone colours are semantic, stable across fixture IDs; no real brand or SKU mapping. */
+function merchandisingTheme(zoneId: string): MerchandisingTheme {
+  switch (zoneId) {
+    case 'zone-beverages': return { style: 'beverages', accent: '#496c77', panel: '#cad9d9', palette: ['#799c94', '#5d8191', '#bca36b', '#d0c6a8'] };
+    case 'zone-household': return { style: 'household', accent: '#68738d', panel: '#d9dde5', palette: ['#94afbd', '#bbc8c0', '#8f9ab1', '#dddacb'] };
+    case 'zone-packaged': return { style: 'packaged', accent: '#a16b4e', panel: '#ddc9b4', palette: ['#b76d4f', '#d1ad63', '#d8c7a3', '#8d9a71'] };
+    case 'zone-bulk': return { style: 'bulk', accent: '#92734d', panel: '#b39a73', palette: ['#c4b18a', '#d7c6a4', '#a39470', '#d4b57c'] };
+    default: return { style: 'mixed', accent: COLORS.trim, panel: '#d5dcd6', palette: PACKS };
+  }
+}
+
 /**
  * Original generic merchandising, not measured stock, inventory, brand packaging or real SKU data.
  * Normalized construction keeps ALL detail inside StoreLayout's existing collision envelope.
@@ -36,26 +49,40 @@ export function buildFixtureDetail(f: Fixture): DetailPart[] {
   const add = (id: string, position: [number, number, number], size: [number, number, number], color: string, material: DetailMaterial = 'metal', primitive: DetailPrimitive = 'box'): void => {
     parts.push({ id, primitive, position: [position[0] * f.widthM, position[1] * f.heightM, position[2] * f.depthM], size: [size[0] * f.widthM, size[1] * f.heightM, size[2] * f.depthM], color, material });
   };
-  const bays = Math.min(8, Math.max(3, Math.round(f.widthM / 0.45)));
+  const theme = merchandisingTheme(f.zoneId);
+  const bottleHeavy = theme.style === 'beverages' || theme.style === 'household';
+  const bays = Math.min(bottleHeavy ? 6 : 8, Math.max(3, Math.round(f.widthM / 0.45)));
   const xAt = (i: number, count: number, span = 0.88): number => ((i + 0.5) / count - 0.5) * span;
 
   switch (f.fixtureType) {
     case 'GONDOLA': {
-      add('plinth', [0, .045, 0], [.98, .09, .96], COLORS.dark);
+      add('plinth', [0, .045, 0], [.98, .09, .96], theme.accent, theme.style === 'bulk' ? 'wood' : 'metal');
       add('central-spine', [0, .52, 0], [.95, .92, .035], COLORS.white);
       for (const x of [-.47, .47]) add(`upright-${x}`, [x, .52, 0], [.025, .96, .055], COLORS.metal);
+      // End panels / coloured bands identify department without covering top-down stock.
+      for (const edge of [-1, 1]) {
+        add(`end-panel-${edge}`, [edge * .485, .47, 0], [.02, .76, .66], theme.panel, theme.style === 'bulk' ? 'wood' : 'metal');
+        add(`department-band-${edge}`, [edge * .497, .78, 0], [.006, .08, .66], theme.accent, 'label');
+        for (let mark = 0; mark < 3; mark++) add(`department-mark-${edge}-${mark}`, [edge * .497, .57 - mark * .065, 0], [.006, .025, .28 - mark * .045], COLORS.white, 'label');
+      }
       for (let level = 0; level < 4; level++) {
         const y = .13 + level * .205;
         add(`shelf-${level}`, [0, y, 0], [.96, .026, .93], COLORS.white);
         for (const side of [-1, 1]) {
-          add(`price-rail-${level}-${side}`, [0, y + .015, side * .468], [.95, .035, .018], COLORS.trim);
+          add(`price-rail-${level}-${side}`, [0, y + .015, side * .468], [.95, .035, .018], theme.accent);
           for (let col = 0; col < bays; col++) {
             const x = xAt(col, bays);
-            const kind = (col + level) % 3;
-            const height = .115 + ((col + level) % 5) * .012;
+            const slot = col + level;
+            const kind = theme.style === 'beverages' ? (slot % 5 === 4 ? 2 : 1)
+              : theme.style === 'household' ? (slot % 4 === 3 ? 0 : 1)
+              : theme.style === 'packaged' ? (slot % 4 === 3 ? 2 : 0)
+              : theme.style === 'bulk' ? 3 : slot % 3;
+            const height = theme.style === 'household' ? .15 + (slot % 3) * .01
+              : theme.style === 'beverages' ? .13 + (slot % 3) * .01
+              : .115 + (slot % 5) * .012;
             const bottom = y + .013;
             const id = `${level}-${side}-${col}`;
-            const color = colorAt(PACKS, col + level);
+            const color = theme.palette[slot % theme.palette.length] ?? COLORS.white;
             if (kind === 1) {
               // Rounded bottle body with a narrow neck and closure, no new mesh primitive.
               add(`pack-bottle-${id}`, [x, bottom + height * .375, side * .24], [.54 / bays, height * .75, .22], color, 'product', 'sphere');
@@ -64,10 +91,13 @@ export function buildFixtureDetail(f: Fixture): DetailPart[] {
             } else if (kind === 2) {
               add(`pack-jar-${id}`, [x, bottom + height * .44, side * .24], [.65 / bays, height * .88, .25], color, 'product', 'sphere');
               add(`jar-lid-${id}`, [x, bottom + height * .93, side * .24], [.52 / bays, height * .10, .20], COLORS.metal);
+            } else if (kind === 3) {
+              add(`pack-sack-${id}`, [x, bottom + height * .46, side * .24], [.70 / bays, height * .92, .30], color, 'product', 'sphere');
+              add(`sack-seam-${id}`, [x, bottom + height * .94, side * .24], [.30 / bays, height * .04, .11], theme.accent, 'wood');
             } else {
               add(`pack-box-${id}`, [x, bottom + height / 2, side * .24], [.70 / bays, height, .31], color, 'product');
             }
-            const face = kind === 1 ? .343 : kind === 2 ? .357 : .398;
+            const face = kind === 1 ? .343 : kind === 2 ? .357 : kind === 3 ? .378 : .398;
             add(`pack-label-${id}`, [x, bottom + height * .43, side * face], [.36 / bays, height * .30, .008], COLORS.label, 'label');
             add(`price-${level}-${side}-${col}`, [x, y + .018, side * .479], [.38 / bays, .021, .006], COLORS.white, 'label');
           }
@@ -107,7 +137,15 @@ export function buildFixtureDetail(f: Fixture): DetailPart[] {
         const y = .22 + level * .22;
         add(`chilled-shelf-${level}`, [0, y, 0], [.95, .025, .8], COLORS.white);
         for (let col = 0; col < doors * 2; col++) {
-          add(`chilled-pack-${level}-${col}`, [xAt(col, doors * 2), y + .08, .08], [.65 / (doors * 2), .13, .4], colorAt(PACKS, col + level), 'product');
+          if (theme.style === 'beverages') {
+            const x = xAt(col, doors * 2);
+            const color = theme.palette[col % theme.palette.length] ?? COLORS.white;
+            add(`chilled-bottle-${level}-${col}`, [x, y + .074, .08], [.58 / (doors * 2), .12, .26], color, 'product', 'sphere');
+            add(`chilled-neck-${level}-${col}`, [x, y + .143, .08], [.22 / (doors * 2), .04, .09], color, 'product');
+            add(`chilled-cap-${level}-${col}`, [x, y + .168, .08], [.25 / (doors * 2), .01, .11], COLORS.white, 'label');
+          } else {
+            add(`chilled-pack-${level}-${col}`, [xAt(col, doors * 2), y + .08, .08], [.65 / (doors * 2), .13, .4], colorAt(PACKS, col + level), 'product');
+          }
         }
       }
       for (let door = 0; door < doors; door++) {
