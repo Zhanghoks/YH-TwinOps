@@ -319,7 +319,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
       <OrbitControls target={[groundCenter[0], 0, groundCenter[1]]} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={220} />
 
       {/* 地面（白膜模式）与取消选择热区 */}
-      <mesh position={[groundCenter[0], -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
+      <mesh position={[groundCenter[0], detailed ? -0.04 : -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
         <planeGeometry args={[layout.widthM + 40, layout.depthM + 40]} />
         <meshStandardMaterial color={shellMode ? '#cfd6dd' : '#dee3e9'} />
       </mesh>
