@@ -128,3 +128,51 @@ it('caps produce item scale instead of enlarging fruit with a wide reference isl
   expect(fruit.every((p)=>p.size[0] <= .18 && p.size[1] <= .15 && p.size[2] <= .18)).toBe(true);
   expect(parts.some((p)=>p.id.endsWith('produce-bed'))).toBe(true);
 });
+
+describe('checkout long-axis construction', () => {
+  it.each([[1.5,5.5],[.12,.5],[1.3,2.6]])('runs belt, scanner and bagging down a %s × %s lane', (widthM, depthM) => {
+    const f = fixture({ fixtureType: 'CHECKOUT', widthM, depthM });
+    const parts = buildFixtureDetail(f);
+    const find = (id: string) => parts.find((p) => p.id === id)!;
+    expect(find('belt').size[2]).toBeGreaterThan(find('belt').size[0]);
+    expect(find('belt').position[2]).toBeLessThan(find('scanner').position[2]);
+    expect(find('scanner').position[2]).toBeLessThan(find('bagging-tray').position[2]);
+    expect(find('pos-screen-frame').size[2]).toBeLessThanOrEqual(.42);
+    for (const p of parts) {
+      expect(Math.abs(p.position[0])+p.size[0]/2).toBeLessThanOrEqual(widthM/2+1e-9);
+      expect(Math.abs(p.position[2])+p.size[2]/2).toBeLessThanOrEqual(depthM/2+1e-9);
+      expect(p.position[1]-p.size[1]/2).toBeGreaterThanOrEqual(-1e-9);
+      expect(p.position[1]+p.size[1]/2).toBeLessThanOrEqual(f.heightM+1e-9);
+    }
+  });
+  it('preserves wide-counter geometry, semantic part IDs and input coordinates', () => {
+    const wide = fixture({ fixtureType:'CHECKOUT',widthM:2.6,depthM:1.2 });
+    const before = structuredClone(wide);
+    const parts = buildFixtureDetail(wide);
+    expect(parts.find((p) => p.id === 'belt')?.position).toEqual([-.18*2.6,.699*wide.heightM,0]);
+    expect(parts.find((p) => p.id === 'belt')?.size).toEqual([.55*2.6,.013*wide.heightM,.72*1.2]);
+    expect(parts.map((p) => p.id)).toEqual(buildFixtureDetail({...wide,widthM:1.5,depthM:5.5}).map((p) => p.id));
+    expect(wide).toEqual(before);
+  });
+});
+
+describe('candidate beverage presentation', () => {
+  it('uses bounded open double-sided bottle shelves only for long narrow beverage candidates', () => {
+    const f = fixture({ zoneId:'zone-beverages',fixtureType:'FREEZER',widthM:2,depthM:10 });
+    const before = structuredClone(f);
+    const parts = buildFixtureDetail(f);
+    expect(parts.some((p) => p.id.startsWith('glass-door-'))).toBe(false);
+    expect(parts.some((p) => p.id.startsWith('pack-bottle-'))).toBe(true);
+    expect(parts.filter((p) => p.id.startsWith('pack-bottle-')).some((p) => p.position[0] < 0)).toBe(true);
+    expect(parts.filter((p) => p.id.startsWith('pack-bottle-')).some((p) => p.position[0] > 0)).toBe(true);
+    expect(parts.length).toBeLessThan(300);
+    for (const p of parts) {
+      expect(Math.abs(p.position[0])+p.size[0]/2).toBeLessThanOrEqual(f.widthM/2+1e-9);
+      expect(Math.abs(p.position[2])+p.size[2]/2).toBeLessThanOrEqual(f.depthM/2+1e-9);
+    }
+    expect(f).toEqual(before);
+    for (const baseline of [{...f,widthM:4,depthM:1.5},{...f,zoneId:'zone-frozen'}]) {
+      expect(buildFixtureDetail(baseline).some((p) => p.id.startsWith('glass-door-'))).toBe(true);
+    }
+  });
+});
