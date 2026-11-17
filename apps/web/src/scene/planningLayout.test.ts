@@ -119,3 +119,36 @@ describe('reference merchandising density', () => {
     expect(top.every((f) => f.widthM === 11)).toBe(true);
   });
 });
+
+describe('fresh departments follow the reference silhouette', () => {
+  it('uses staggered varied produce islands and diagonal edge displays', () => {
+    const { layout } = generatePlanningLayout(baseline);
+    const produce = layout.fixtures.filter((f) => f.zoneId === 'zone-produce');
+    expect(produce).toHaveLength(15);
+    expect(produce.filter((f) => f.rotationY !== 0)).toHaveLength(3);
+    expect(new Set(produce.map((f) => f.widthM)).size).toBeGreaterThan(3);
+    expect(new Set(produce.filter((f) => f.rotationY === 0).map((f) => f.x)).size).toBeGreaterThan(3);
+  });
+  it('adds limited perimeter produce and deli displays, not operational objects', async () => {
+    const { buildReferenceDisplayFixtures } = await import('./planningLayout');
+    const { layout } = generatePlanningLayout(baseline);
+    const displays = buildReferenceDisplayFixtures(layout);
+    expect(displays).toHaveLength(53);
+    const { report } = generatePlanningLayout(baseline);
+    for (const f of displays) {
+      const region = report.referenceRegions.find((r) => r.zoneIds.includes(f.zoneId))!;
+      const c = Math.abs(Math.cos(f.rotationY)), sn = Math.abs(Math.sin(f.rotationY));
+      const w = c*f.widthM+sn*f.depthM, d = sn*f.widthM+c*f.depthM;
+      expect(f.x-w/2).toBeGreaterThanOrEqual(region.bounds.x0-1e-8);
+      expect(f.x+w/2).toBeLessThanOrEqual(region.bounds.x1+1e-8);
+      expect(f.z-d/2).toBeGreaterThanOrEqual(region.bounds.z0-1e-8);
+      expect(f.z+d/2).toBeLessThanOrEqual(region.bounds.z1+1e-8);
+    }
+    expect(displays.filter((f) => f.zoneId === 'zone-produce')).toHaveLength(2);
+    expect(displays.filter((f) => f.zoneId === 'zone-deli')).toHaveLength(2);
+    for (const id of ['zone-deli','zone-bakery']) {
+      expect(layout.fixtures.filter((f) => f.zoneId === id && f.rotationY === Math.PI/2).length).toBeGreaterThanOrEqual(2);
+    }
+    expect(validatePlanningLayout({...layout, fixtures:[...layout.fixtures,...displays]}).issues).toEqual([]);
+  });
+});
