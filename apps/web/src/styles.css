@@ -939,3 +939,8 @@ code {
 
 /* Stable fallback before Drei assigns its first inline depth index. */
 .reference-html-anchor { z-index: 9; pointer-events: none; }
+
+/* Focused inspection keeps assistant state mounted, but frees the full viewport for the same canvas. */
+.workbench .main.model-focused .scene-pane { flex: 1 1 100% !important; width: 100% !important; }
+.workbench .main.model-focused .agent-pane,
+.workbench .main.model-focused .workbench-split-handle { display: none !important; }
