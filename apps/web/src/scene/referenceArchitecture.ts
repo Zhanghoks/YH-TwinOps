@@ -37,10 +37,11 @@ export function buildReferenceArchitecture(fixtures: readonly Fixture[] = []): A
     }
     add(`truck-${i}-dock-line`, [x, .025, -34.5], [4.3, .025, .08], '#d6ba54');
   }
-  // Spare warehouse racks stay west of the four retained backroom fixture footprints [-14,12].
-  for (let col = 0; col < 2; col++) for (let row = 0; row < 3; row++) {
+  // Two transverse carton rows surround, but never overlap, retained backroom footprints.
+  // Decorative cartons are not warehouse inventory or capacity measurements.
+  for (let col = 0; col < 7; col++) for (let row = 0; row < 2; row++) {
     group();
-    const x = -28 + col * 7, z = -46 + row * 5;
+    const x = -28 + col * 6.3, z = row === 0 ? -47.3 : -34.4;
     const id = `warehouse-rack-${col}-${row}`;
     for (const edge of [-1, 1]) add(`${id}-upright-${edge}`, [x + edge * 2.5, 1.2, z], [.12, 2.4, 2.2], '#586b68');
     for (let level = 0; level < 2; level++) {
@@ -81,17 +82,20 @@ export function buildReferenceArchitecture(fixtures: readonly Fixture[] = []): A
   group();
   add('service-desk-base', [-25, .55, 37], [14, 1.1, 1.6], '#dfd9c6');
   add('service-desk-top', [-25, 1.15, 37], [14, .1, 1.8], '#50766a');
-  add('service-desk-return', [-31.2, .55, 38.8], [1.6, 1.1, 2], '#dfd9c6');
+  for (const [side, x] of [-31.2, -18.8].entries()) {
+    add(`service-desk-return-${side}`, [x, .55, 39.4], [1.6, 1.1, 3.4], '#dfd9c6');
+    add(`service-desk-return-top-${side}`, [x, 1.15, 39.4], [1.8, .1, 3.6], '#50766a');
+  }
   for (let i = 0; i < 2; i++) {
     add(`service-desk-screen-${i}`, [-29 + i * 8, 1.5, 37], [.7, .55, .12], '#344e50');
     add(`service-desk-screen-base-${i}`, [-29 + i * 8, 1.3, 37], [.15, .2, .15], dark);
   }
-  for (let row = 0; row < 3; row++) {
+  for (let row = 0; row < 6; row++) {
     group();
-    const x = -57 + row * 3.8;
-    for (const side of [-1, 1]) add(`cart-bay-${row}-rail-${side}`, [x + side * 1.25, .65, 43.5], [.08, .08, 6], steel);
-    for (let cart = 0; cart < 4; cart++) {
-      const z = 41.3 + cart * 1.3;
+    const x = -59.5 + row * 2.2;
+    for (const side of [-1, 1]) add(`cart-bay-${row}-rail-${side}`, [x + side * .85, .65, 43.5], [.08, .08, 6], steel);
+    for (let cart = 0; cart < 10; cart++) {
+      const z = 41.3 + cart * .5;
       const id = `cart-bay-${row}-cart-${cart}`;
       add(`${id}-basket`, [x, .8, z], [1.2, .65, 1.45], '#b7c0bb', { transparent: true });
       add(`${id}-basket-rim`, [x, 1.14, z], [1.25, .07, 1.5], steel);
@@ -99,6 +103,16 @@ export function buildReferenceArchitecture(fixtures: readonly Fixture[] = []): A
       for (const side of [-1, 1]) add(`${id}-wheel-${side}`, [x + side * .42, .16, z], [.2, .32, .32], dark, { primitive: 'sphere' });
     }
   }
+  // Retracted glass door side panels leave a 13m central opening. No automatic-door simulation.
+  // Only shallow floor inlays continue across the opening, with no raised threshold.
+  for (const [index, x] of [-31.3, -13.7].entries()) {
+    group();
+    add(`entry-glass-${index}`, [x, 1.25, 49.5], [4.2, 2.5, .12], '#c0ded9', { transparent: true });
+    for (const edge of [-1, 1]) add(`entry-jamb-${index}-${edge}`, [x + edge * 2.12, 1.3, 49.5], [.08, 2.6, .18], steel);
+    add(`entry-lintel-${index}`, [x, 2.58, 49.5], [4.32, .08, .18], steel);
+  }
+  group();
+  for (let i = 0; i < 3; i++) add(`entry-paving-${i}`, [-22.5, .006, 46 + i * 1.4], [12.6, .012, .06], '#b9b5a6');
   const occupied: OBB[] = fixtures.map((f) => ({ cx: f.x, cz: f.z, ux: Math.cos(f.rotationY), uz: -Math.sin(f.rotationY), hl: f.widthM / 2, hw: f.depthM / 2 }));
   return clusters.filter((cluster) => !cluster.some((p) => occupied.some((f) => obbsOverlap({ cx: p.position[0], cz: p.position[2], ux: 1, uz: 0, hl: p.size[0] / 2, hw: p.size[2] / 2 }, f)))).flat();
 }
