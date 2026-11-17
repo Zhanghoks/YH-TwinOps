@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { Fixture, StoreLayout } from '@yh/contracts';
 import { buildFixtureDetail, type DetailPart } from './detailGeometry';
 import { buildStoreArchitecture, type ArchitecturePart } from './storeArchitecture';
+import { buildReferenceArchitecture } from './referenceArchitecture';
 import { buildSurfacePixels, type SurfaceKind } from './materialSurface';
 
 interface Instance { part: DetailPart; fixture: Fixture }
@@ -133,7 +134,7 @@ function ArchitectureBatch({ parts, primitive, transparent, emissive }: { parts:
 }
 
 /** Perimeter-only architectural context, never added to business collision geometry. */
-export function StoreEnvelope({ layout, center }: { layout: StoreLayout; center: readonly [number, number] }) {
+export function StoreEnvelope({ layout, center, reference = false }: { layout: StoreLayout; center: readonly [number, number]; reference?: boolean }) {
   const w = layout.widthM;
   const d = layout.depthM;
   const signTexture = useMemo(() => {
@@ -152,12 +153,13 @@ export function StoreEnvelope({ layout, center }: { layout: StoreLayout; center:
   }, []);
   useEffect(() => () => signTexture.dispose(), [signTexture]);
   const batches = useMemo(() => {
-    const parts = buildStoreArchitecture(w, d);
+    const shell = buildStoreArchitecture(w, d, reference ? { entranceCenterX: -22.5, entranceWidthM: 23, neutralFacade: true } : {});
+    const parts = reference ? [...shell.filter((p) => !p.id.startsWith('entrance-cart-rack')), ...buildReferenceArchitecture(layout.fixtures)] : shell;
     return (['box', 'sphere'] as const).flatMap((primitive) => [false, true].flatMap((transparent) => [false, true].map((emissive) => ({
       primitive, transparent, emissive,
       parts: parts.filter((p) => p.primitive === primitive && !!p.transparent === transparent && !!p.emissive === emissive),
     })))).filter((batch) => batch.parts.length > 0);
-  }, [w, d]);
+  }, [w, d, reference, layout.fixtures]);
   return <group position={[center[0], 0, center[1]]}>
     <mesh position={[0, -.13, 0]} receiveShadow>
       <boxGeometry args={[w + .6, .24, d + .6]} /><meshStandardMaterial color="#e8e2d3" roughness={.72} />
@@ -171,9 +173,9 @@ export function StoreEnvelope({ layout, center }: { layout: StoreLayout; center:
     <mesh position={[0, 1.8, -d / 2 - .45]} receiveShadow>
       <boxGeometry args={[w + .5, 3.6, .28]} /><meshStandardMaterial color="#e0d8c8" roughness={.8} />
     </mesh>
-    <mesh position={[0, 2.9, d / 2 + .39]}>
+    {!reference && <mesh position={[0, 2.9, d / 2 + .39]}>
       <planeGeometry args={[Math.min(w * .45, 18), .82]} /><meshBasicMaterial map={signTexture} toneMapped={false} />
-    </mesh>
+    </mesh>}
     {batches.map((batch) => <ArchitectureBatch key={`${batch.primitive}-${batch.transparent}-${batch.emissive}`} {...batch} />)}
   </group>;
 }
