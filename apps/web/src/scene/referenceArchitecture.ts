@@ -46,7 +46,10 @@ export function buildReferenceArchitecture(fixtures: readonly Fixture[] = []): A
     for (const edge of [-1, 1]) add(`${id}-upright-${edge}`, [x + edge * 2.5, 1.2, z], [.12, 2.4, 2.2], '#586b68');
     for (let level = 0; level < 2; level++) {
       add(`${id}-shelf-${level}`, [x, .25 + level * 1.15, z], [5.2, .12, 2.2], '#c69a56');
-      for (let c = 0; c < 3; c++) add(`${id}-carton-${level}-${c}`, [x + (c - 1) * 1.55, .72 + level * 1.15, z], [1.3, .8, 1.65], c % 2 ? '#dcc085' : crate);
+      for (let c = 0; c < 3; c++) {
+        add(`${id}-carton-${level}-${c}`, [x + (c - 1) * 1.55, .72 + level * 1.15, z], [1.3, .8, 1.65], c % 2 ? '#dcc085' : crate);
+        add(`${id}-carton-tape-${level}-${c}`, [x + (c - 1) * 1.55, 1.125 + level * 1.15, z], [.16, .01, 1.65], '#e2c987');
+      }
     }
   }
   // Low cutaway partitions, with front portal gaps and no roof over operational views.
@@ -55,6 +58,8 @@ export function buildReferenceArchitecture(fixtures: readonly Fixture[] = []): A
   add('processing-partition-east', [39.5, .65, -41], [.28, 1.3, 17.6], '#d1d6d1');
   add('processing-partition-front-a', [21, .65, -32.25], [10.1, 1.3, .3], '#d1d6d1');
   add('processing-partition-front-b', [34.8, .65, -32.25], [9.1, 1.3, .3], '#d1d6d1');
+  // A cutaway preparation divider leaves a central four-metre staff passage.
+  for (const x of [21.8, 33.7]) add(`processing-internal-partition-${x}`, [x, .5, -41.4], [8, 1, .18], '#d9ded6');
   for (let i = 0; i < 4; i++) {
     group();
     const x = i % 2 ? 33 : 22, z = i < 2 ? -45.5 : -37.4;
@@ -75,7 +80,7 @@ export function buildReferenceArchitecture(fixtures: readonly Fixture[] = []): A
     add(`${id}-handle`, [x + 1.1, 1.05, -32.28], [.08, .55, .08], dark);
     for (let row = 0; row < 2; row++) {
       add(`${id}-rack-${row}`, [x, .45, -46 + row * 6], [6.8, .9, 2.2], '#a5b9b8');
-      add(`${id}-crate-${row}`, [x, 1.15, -46 + row * 6], [6.2, .5, 1.8], '#cad8d4');
+      for (let col = 0; col < 3; col++) for (let tier = 0; tier < 2; tier++) add(`${id}-crate-${row}-${col}-${tier}`, [x + (col - 1) * 2.1, 1.12 + tier * .5, -46 + row * 6], [1.85, .44, 1.7], (col + tier) % 2 ? '#b7c9c2' : '#dae1d7');
     }
   }
   // Reference service counter sits behind the entrance; z[43,50] remains an open approach.
@@ -129,6 +134,11 @@ export function buildReferenceArchitecture(fixtures: readonly Fixture[] = []): A
     add(`${id}-number-board`, [f.x, 2.3, 35.2], [1.4, .1, .8], '#2e6455');
     add(`${id}-sign-post`, [f.x, 1.1, 35.2], [.07, 2.2, .07], steel);
     add(`${id}-sign-foot`, [f.x, .045, 35.2], [.32, .09, .32], dark);
+    group();
+    // Individual longitudinal separators stop before the full-width southern walking strip.
+    // They depict furniture only, not queue lengths, occupancy or an approved egress design.
+    for (const z of [43.1, 45.2]) add(`${id}-queue-separator-post-${z}`, [f.x + 1.25, .55, z], [.08, 1.1, .08], steel);
+    add(`${id}-queue-separator-rail`, [f.x + 1.25, .9, 44.15], [.08, .08, 2.1], '#87958e');
   });
   // Short impulse tables occupy the checkout band's front edge, not the z[29,34] cross aisle.
   // They are generic decorative product blocks, never priced stock or operational fixtures.
