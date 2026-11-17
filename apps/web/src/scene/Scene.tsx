@@ -1,9 +1,11 @@
+import { REFERENCE_SERVICE_LABELS } from './referenceArchitecture';
+import type { ReferenceRegion } from './planningLayout';
 /** StoreLayout-driven single-canvas scene; procedural detail never changes business geometry. */
-import { Suspense, useMemo } from 'react';
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { buildSceneCamera, type CameraView } from './sceneCamera';
 import { DetailedFixtures, StoreEnvelope } from './DetailedStore';
 import * as THREE from 'three';
-import { Canvas, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Html, OrbitControls, useGLTF } from '@react-three/drei';
 import { isDecisionUsable, METRICS, type Fixture, type StoreLayout, type TwinSnapshot, type ZoneState } from '@yh/contracts';
 import { useWorkbench, type ViewLayer } from '../state';
@@ -13,6 +15,28 @@ export interface AssetManifest {
   approved: Map<string, string>;
   /** 整店外壳 GLB URL（role=store-shell 且 approved）；缺省时走白膜模式。 */
   shellUrl?: string;
+}
+
+/** One extra demand frame after camera/HTML mounts, without a permanent render loop. */
+function SettleView({ revision }: { revision: string }) {
+  const invalidate = useThree((state) => state.invalidate);
+  useEffect(() => {
+    let second = 0;
+    const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => invalidate()); });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, [invalidate, revision]);
+  return null;
+}
+
+/** Mount DOM annotations only after the new camera and controls have settled. */
+function ReadyLabels({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let second = 0;
+    const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => setReady(true)); });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, []);
+  return ready ? <>{children}</> : null;
 }
 
 const WHITE = '#eceff1';
@@ -280,7 +304,7 @@ function ZoneNode({
   );
 }
 
-export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, planningGuides }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; planningGuides?: { centralWidthM: number; crossZ0: number; crossZ1: number } }) {
+export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, referenceRegions }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; referenceRegions?: ReferenceRegion[] }) {
   const layer = useWorkbench((s) => s.layer);
   const selection = useWorkbench((s) => s.selection);
   const select = useWorkbench((s) => s.select);
@@ -312,14 +336,15 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
     return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2] as const;
   }, [zoneRects, layout, fixedCenter]);
 
-  const camera = buildSceneCamera(cameraView, groundCenter, layout.depthM);
+  const camera = buildSceneCamera(cameraView, groundCenter, layout.depthM, layout.widthM);
   return (
-    <Canvas key={`${cameraView}-${cameraRevision}`} shadows frameloop="demand" camera={{ position: camera.position, fov: 42 }} dpr={[1, 1.5]}>
+    <Canvas className="scene-canvas" key={`${cameraView}-${cameraRevision}`} shadows frameloop="demand" camera={{ position: camera.position, fov: 42 }} dpr={[1, 1.5]}>
+      <SettleView revision={`${cameraView}-${cameraRevision}-${showLabels}-${!!referenceRegions}`} />
       <color attach="background" args={['#e8eceb']} />
       {/* shell 模型自带较暗的烘焙色调，光照对齐老原型的强度口径 */}
       <hemisphereLight args={[shellMode ? '#e5fff0' : '#fff3d9', shellMode ? '#34413e' : '#56615c', shellMode ? 2.1 : 1.05]} />
       <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.65} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
-      <OrbitControls target={camera.target} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={220} />
+      <OrbitControls target={camera.target} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={Math.max(220, layout.depthM * 4)} />
 
       {/* 地面（白膜模式）与取消选择热区 */}
       <mesh position={[groundCenter[0], detailed ? -0.04 : -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
@@ -333,21 +358,18 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
       {shellMode && <ShellModel url={manifest.shellUrl as string} onSelect={(id) => (id === null ? select(null) : select({ kind: 'fixture', id }))} />}
 
       {detailed && <>
-        <StoreEnvelope layout={layout} center={groundCenter} />
+        <StoreEnvelope layout={layout} center={groundCenter} reference={!!referenceRegions} />
         <DetailedFixtures fixtures={layout.fixtures} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
       </>}
 
-      {/* Planning overlays only: not painted surfaces or regulatory clearance certification. */}
-      {planningGuides && !shellMode && <group>
-        <mesh position={[0, .025, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}>
-          <planeGeometry args={[planningGuides.centralWidthM, layout.depthM]} />
-          <meshBasicMaterial color="#829e91" transparent opacity={.20} depthWrite={false} />
-        </mesh>
-        <mesh position={[0, .026, (planningGuides.crossZ0 + planningGuides.crossZ1) / 2]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}>
-          <planeGeometry args={[layout.widthM, planningGuides.crossZ1 - planningGuides.crossZ0]} />
-          <meshBasicMaterial color="#829e91" transparent opacity={.20} depthWrite={false} />
-        </mesh>
-      </group>}
+      <ReadyLabels>
+      {referenceRegions && showLabels && layer === 'none' && referenceRegions.filter((region) => region.code !== 'BACK').map((region) => <Html wrapperClass="reference-html-anchor" key={region.code} position={[(region.bounds.x0 + region.bounds.x1) / 2, 3, (region.bounds.z0 + region.bounds.z1) / 2]} center zIndexRange={[10, 0]}>
+        <div className="zone-label reference-label"><strong>{region.label}</strong><span>{region.code === 'BACK' ? '参考图后勤带' : region.code} · 图面分区</span></div>
+      </Html>)}
+
+      {referenceRegions && showLabels && layer === 'none' && REFERENCE_SERVICE_LABELS.filter((item) => item.id !== 'service' && item.id !== 'entry').map((item) => <Html wrapperClass="reference-html-anchor" key={item.id} position={[...item.position]} center zIndexRange={[10, 0]}><div className="zone-label reference-label"><strong>{item.id === 'chilled' ? '冷藏' : item.id === 'frozen' ? '冷冻' : item.text}</strong><span>图面推定</span></div></Html>)}
+
+      </ReadyLabels>
 
       {/* 分区数据叠加层与标签 */}
       {layout.zones.map((z) => {
@@ -358,7 +380,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
           <ZoneNode
             key={z.zoneId}
             zone={state}
-            name={showLabels ? z.name : ''}
+            name={showLabels && (!referenceRegions || layer !== 'none') ? z.name : ''}
             rect={rect}
             fill={colors.zoneFill(state)}
             badge={colors.zoneBadge(state)}
