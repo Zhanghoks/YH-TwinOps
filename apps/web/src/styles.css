@@ -919,3 +919,9 @@ code {
 .scene-mode-note { position: absolute; bottom: 62px; left: 16px; z-index: 5; font-size: 11px; color: #475569; background: #fffffff0; padding: 5px 8px; border-radius: 4px; pointer-events: none; }
 .zone-label small { font-size: 9px; opacity: 0.7; }
 .layer-bar [data-slot='segmented-control-item'][data-disabled] { opacity: 0.45; cursor: not-allowed; }
+
+/* Compact store wayfinding, independent of camera distance. */
+.zone-label { background: rgba(48, 45, 40, .90); border: 1px solid rgba(255,255,255,.85); border-radius: 7px; box-shadow: 0 3px 10px #0002; padding: 4px 8px; font-size: 11px; gap: 1px; }
+.zone-label strong { font-weight: 650; }
+.zone-label span { font-size: 9px; color: #e0dfda; }
+.zone-label.is-selected { background: #8f342d; border-color: #ffdd9a; }
