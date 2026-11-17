@@ -38,7 +38,8 @@ function merchandisingTheme(zoneId: string): MerchandisingTheme {
  * Normalized construction keeps ALL detail inside StoreLayout's existing collision envelope.
  * Bounded bay counts cap instance count even for exceptionally large fixture dimensions.
  */
-export function buildFixtureDetail(f: Fixture): DetailPart[] {
+export type DetailFixtureShape = Pick<Fixture, 'fixtureId' | 'fixtureType' | 'zoneId' | 'widthM' | 'depthM' | 'heightM' | 'x' | 'y' | 'z' | 'rotationY'>;
+export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
   if (![f.widthM, f.depthM, f.heightM].every((n) => Number.isFinite(n) && n > 0)) {
     throw new RangeError('Fixture dimensions must be finite and positive');
   }
