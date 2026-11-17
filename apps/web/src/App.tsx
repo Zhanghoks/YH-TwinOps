@@ -143,7 +143,7 @@ export function App(): React.JSX.Element {
               <button type="button" aria-pressed={showLabels} onClick={() => setShowLabels((v) => !v)}>{showLabels ? '隐藏分区' : '显示分区'}</button>
               <span>拖动旋转 · 滚轮缩放 · 点击设施</span>
             </div>
-            <div className="scene-mode-note">{sceneMode === 'detail' ? '程序化精细模型 · 商品为装饰，不代表库存' : sceneMode === 'shell' ? '已登记原始外壳 · 基线未修改' : '布局白膜 · 设施尺寸来自布局数据'}</div>
+            <div className="scene-mode-note">{sceneMode === 'detail' ? `合成教学布局 ${layout.widthM}×${layout.depthM} m · 商品为装饰，不代表库存` : sceneMode === 'shell' ? '已登记原始外壳 · 基线未修改' : '布局白膜 · 设施尺寸来自布局数据'}</div>
             <SceneBoundary><Scene snapshot={snapshot} layout={layout} manifest={manifest} mode={sceneMode} cameraView={cameraView} cameraRevision={cameraRevision} showLabels={showLabels} /></SceneBoundary>
           </div>
         </ResizablePanel>
