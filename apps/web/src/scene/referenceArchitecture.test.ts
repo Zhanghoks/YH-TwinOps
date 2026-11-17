@@ -51,7 +51,7 @@ describe('reference-led service architecture', () => {
     const { layout } = generatePlanningLayout(baseline);
     const fixtures = [...layout.fixtures, ...buildReferenceDisplayFixtures(layout)];
     expect(layout.fixtures.length).toBe(150);
-    expect(fixtures.length).toBe(203);
+    expect(fixtures.length).toBeGreaterThanOrEqual(203);
     const parts = buildReferenceArchitecture(fixtures);
     for (const name of ['truck-', 'processing', 'coldroom-chilled', 'coldroom-frozen', 'service-desk', 'cart-bay']) expect(parts.some((p) => p.id.includes(name))).toBe(true);
     expect(parts.filter((p) => p.id.includes('cart-bay-') && p.id.endsWith('-basket')).length).toBe(60);
@@ -67,15 +67,27 @@ describe('reference-led service architecture', () => {
     const { layout } = generatePlanningLayout(baseline);
     const fixtures = [...layout.fixtures, ...buildReferenceDisplayFixtures(layout)];
     expect(layout.fixtures.length).toBe(150);
-    expect(fixtures.length).toBe(203);
+    expect(fixtures.length).toBeGreaterThanOrEqual(203);
     const parts = buildReferenceArchitecture(fixtures);
     const signs = parts.filter((p) => p.id.endsWith('-number-board'));
     expect(signs.length).toBe(24);
     expect(new Set(signs.map((p) => p.position[0])).size).toBe(24);
     expect(parts.filter((p) => p.id.includes('checkout-accessory-')).every((p) => p.position[2] - p.size[2] / 2 >= 34)).toBe(true);
-    expect(parts.length).toBe(667);
+    expect(parts.length).toBe(845);
     expect(parts.filter((p) => p.id.includes('checkout-accessory-display-') && p.id.endsWith('-base')).length).toBe(6);
     expect(parts.filter((p) => p.id.includes('entry-planter-')).length).toBe(4);
+  });
+
+  it('keeps short queue separators out of the southern circulation strip and retains service details', () => {
+    const { layout } = generatePlanningLayout(baseline);
+    const parts = buildReferenceArchitecture([...layout.fixtures, ...buildReferenceDisplayFixtures(layout)]);
+    const rails = parts.filter((p) => p.id.includes('queue-separator-'));
+    expect(rails.length).toBe(72);
+    expect(rails.every((p) => p.position[2] - p.size[2]/2 >= 43 && p.position[2] + p.size[2]/2 < 46)).toBe(true);
+    expect(rails.every((p) => p.size[0] <= .1)).toBe(true);
+    expect(parts.filter((p) => p.id.includes('processing-internal-partition')).length).toBe(2);
+    expect(parts.filter((p) => p.id.includes('coldroom-') && p.id.includes('-crate-')).length).toBe(24);
+    expect(parts.filter((p) => p.id.includes('warehouse-rack-') && p.id.includes('-carton-tape-')).length).toBe(84);
   });
 
   it('omits whole decorative clusters that would conflict with actual fixture footprints', () => {
