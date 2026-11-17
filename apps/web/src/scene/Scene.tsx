@@ -1,11 +1,6 @@
-/**
- * 全店 3D 场景：StoreLayout 数据驱动的运营视图。
- * 两种视觉模式（spec US-15：布局唯一事实源是 StoreLayout，模型只是皮，业务 ID 不变）：
- * - shell 模式：登记台账 approved 的整店外壳 GLB（yh-large-concept，节点名前缀=设施 id）；
- *   分区平面退化为半透明数据叠加层，点击外壳网格按节点名拾取设施。
- * - 白膜模式：没有可用外壳时，按 fixtureType 语义化白膜盒体渲染（默认回退）。
- */
+/** StoreLayout-driven single-canvas scene; procedural detail never changes business geometry. */
 import { Suspense, useMemo } from 'react';
+import { DetailedFixtures, StoreEnvelope } from './DetailedStore';
 import * as THREE from 'three';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { Html, OrbitControls, useGLTF } from '@react-three/drei';
@@ -37,6 +32,8 @@ function trafficColor(value: number): string {
   if (value > 40) return '#fcd34d';
   return '#bbf7d0';
 }
+
+export type SceneMode = 'detail' | 'shell' | 'white';
 
 interface LayerColors {
   zoneFill: (zone: ZoneState) => string;
@@ -240,6 +237,7 @@ function ShellModel({ url, onSelect }: { url: string; onSelect: (id: string | nu
 
 function ZoneNode({
   zone,
+  name,
   rect,
   fill,
   badge,
@@ -248,6 +246,7 @@ function ZoneNode({
   onSelect,
 }: {
   zone: ZoneState;
+  name: string;
   rect: readonly [number, number, number, number];
   fill: string;
   badge: string;
@@ -270,22 +269,23 @@ function ZoneNode({
         <planeGeometry args={[x1 - x0, z1 - z0]} />
         <meshBasicMaterial color={fill} transparent opacity={opacity} depthWrite={false} />
       </mesh>
-      <Html position={[cx, shellMode ? 2.6 : 0.6, cz]} center distanceFactor={55} zIndexRange={[10, 0]}>
+      {name !== '' && <Html position={[cx, shellMode ? 2.6 : 0.6, cz]} center distanceFactor={55} zIndexRange={[10, 0]}>
         <div className="zone-label" style={{ pointerEvents: 'none' }}>
-          <strong>{zone.zoneId.replace('zone-', '')}</strong>
+          <strong>{name.split(' / ')[0]}</strong><small>{zone.zoneId.replace('zone-', '')}</small>
           {badge !== '' && <span>{badge}</span>}
         </div>
-      </Html>
+      </Html>}
     </group>
   );
 }
 
-export function Scene({ snapshot, layout, manifest }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest }) {
+export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: 'overview' | 'top'; cameraRevision?: number; showLabels?: boolean }) {
   const layer = useWorkbench((s) => s.layer);
   const selection = useWorkbench((s) => s.selection);
   const select = useWorkbench((s) => s.select);
   const colors = layerColors(layer);
-  const shellMode = manifest.shellUrl !== undefined;
+  const shellMode = mode === 'shell' && manifest.shellUrl !== undefined;
+  const detailed = mode === 'detail';
   const zoneById = useMemo(() => Object.fromEntries(Object.values(snapshot.zones).map((z) => [z.zoneId, z])), [snapshot]);
 
   const zoneRects = useMemo(
@@ -311,23 +311,28 @@ export function Scene({ snapshot, layout, manifest }: { snapshot: TwinSnapshot; 
   }, [zoneRects, layout]);
 
   return (
-    <Canvas camera={{ position: [shellMode ? 46 : 50, 58, shellMode ? 74 : 118], fov: 42 }} dpr={[1, 2]}>
-      <color attach="background" args={['#f5f7fa']} />
+    <Canvas key={`${cameraView}-${cameraRevision}`} shadows frameloop="demand" camera={{ position: cameraView === 'top' ? [groundCenter[0], 115, groundCenter[1] + 0.1] : [groundCenter[0] + 48, 64, groundCenter[1] + 78], fov: 42 }} dpr={[1, 1.5]}>
+      <color attach="background" args={['#e8eceb']} />
       {/* shell 模型自带较暗的烘焙色调，光照对齐老原型的强度口径 */}
-      <hemisphereLight args={['#e5fff0', '#34413e', shellMode ? 2.1 : 0.9]} />
-      <directionalLight position={[30, 70, 35]} intensity={shellMode ? 2.1 : 0.9} color="#fff3d6" />
-      <OrbitControls target={[groundCenter[0], 0, groundCenter[1]]} maxPolarAngle={Math.PI / 2.05} minDistance={12} maxDistance={220} />
+      <hemisphereLight args={['#e5fff0', '#34413e', shellMode ? 2.1 : 1.5]} />
+      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.2} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={60} shadow-camera-bottom={-60} shadow-camera-far={150} shadow-normalBias={0.05} />
+      <OrbitControls target={[groundCenter[0], 0, groundCenter[1]]} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={220} />
 
       {/* 地面（白膜模式）与取消选择热区 */}
       <mesh position={[groundCenter[0], -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
         <planeGeometry args={[layout.widthM + 40, layout.depthM + 40]} />
         <meshStandardMaterial color={shellMode ? '#cfd6dd' : '#dee3e9'} />
       </mesh>
-      {!shellMode && (
+      {!shellMode && !detailed && (
         <gridHelper args={[layout.widthM, layout.widthM / 2, '#c4ccd4', '#d8dee4']} position={[groundCenter[0], 0.005, groundCenter[1]]} />
       )}
 
       {shellMode && <ShellModel url={manifest.shellUrl as string} onSelect={(id) => (id === null ? select(null) : select({ kind: 'fixture', id }))} />}
+
+      {detailed && <>
+        <StoreEnvelope layout={layout} center={groundCenter} />
+        <DetailedFixtures fixtures={layout.fixtures} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
+      </>}
 
       {/* 分区数据叠加层与标签 */}
       {layout.zones.map((z) => {
@@ -338,18 +343,19 @@ export function Scene({ snapshot, layout, manifest }: { snapshot: TwinSnapshot; 
           <ZoneNode
             key={z.zoneId}
             zone={state}
+            name={showLabels ? z.name : ''}
             rect={rect}
             fill={colors.zoneFill(state)}
             badge={colors.zoneBadge(state)}
             selected={selection?.kind === 'zone' && selection.id === z.zoneId}
-            shellMode={shellMode}
+            shellMode={shellMode || detailed}
             onSelect={(id) => select({ kind: 'zone', id })}
           />
         );
       })}
 
       {/* 白膜模式的设施渲染（shell 模式下设施视觉来自外壳模型，点击拾取走节点名） */}
-      {!shellMode &&
+      {!shellMode && !detailed &&
         layout.fixtures.map((f) => (
           <FixtureNode
             key={f.fixtureId}
