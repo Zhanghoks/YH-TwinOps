@@ -39,6 +39,10 @@ describe('scene presentation controls', () => {
     expect(state().showLabels).toBe(false);
     await user.click(screen.getByRole('button', { name: '显示分区' }));
     expect(state().showLabels).toBe(true);
+    await user.click(screen.getByRole('button', { name: '专注模型' }));
+    expect(document.querySelector('.main.model-focused')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '返回工作台' }));
+    expect(document.querySelector('.main.model-focused')).toBeNull();
     const baseline = JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').layout;
     await user.click(screen.getByRole('button', { name: '布局检查' }));
     await user.click(screen.getByRole('button', { name: '按图候选' }));
