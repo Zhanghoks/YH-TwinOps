@@ -66,24 +66,64 @@ export function validatePlanningLayout(layout: StoreLayout): PlanningValidation 
 }
 
 interface Grid { bounds: Bounds; columns: number; widthM: number; depthM: number }
-/** Sparse representative fixtures, not a claim that the image contains exactly these 150 objects. */
+/** Remaining departments use bounded grids; image-specific arrangements override these below. */
 const GRIDS: Record<string, Grid> = {
-  'zone-seafood': { bounds: rectangle(-62,-44,-30,-13), columns: 2, widthM: 6, depthM: 2.5 },
-  'zone-meat': { bounds: rectangle(-43,-25,-30,-13), columns: 2, widthM: 7, depthM: 2.5 },
   'zone-deli': { bounds: rectangle(-62,-27,-10,2), columns: 3, widthM: 8, depthM: 2.5 },
   'zone-produce': { bounds: rectangle(-62,-29,4,32), columns: 3, widthM: 7, depthM: 3 },
-  'zone-frozen': { bounds: rectangle(-23,28,-31,-13), columns: 6, widthM: 6.5, depthM: 2.3 },
   'zone-bakery': { bounds: rectangle(31,43,-30,-13), columns: 2, widthM: 3.8, depthM: 1.5 },
-  'zone-daily': { bounds: rectangle(46,62,-30,-8), columns: 1, widthM: 11, depthM: 2.8 },
-  'zone-packaged': { bounds: rectangle(-23,30,-12,10), columns: 6, widthM: 6.6, depthM: 1.4 },
-  'zone-bulk': { bounds: rectangle(1,30,13,24), columns: 3, widthM: 7, depthM: 1.4 },
-  'zone-featured': { bounds: rectangle(1,30,26,29), columns: 3, widthM: 7, depthM: 1.4 },
   'zone-beverages': { bounds: rectangle(-28,-3,15,29), columns: 6, widthM: 2, depthM: 10 },
-  'zone-household': { bounds: rectangle(33,61,-5,29), columns: 3, widthM: 7, depthM: 1.6 },
   // Deliberately reserved footprints coordinated with separate architectural decorations.
   'zone-backroom': { bounds: rectangle(-14,12,-43,-37), columns: 4, widthM: 5.2, depthM: 6 },
   'zone-rest': { bounds: rectangle(-44,-35,44,45), columns: 3, widthM: 2, depthM: .8 },
 };
+type DisplaySlot = Pick<Fixture, 'x' | 'z' | 'widthM' | 'depthM' | 'rotationY'>;
+function slot(x: number, z: number, widthM: number, depthM: number, rotationY = 0): DisplaySlot { return { x, z, widthM, depthM, rotationY }; }
+function foodSlots(): { zoneId: string; decorative: boolean; slot: DisplaySlot }[] {
+  const xs = [-20,-12,-2,9,19,28], widths = [4.8,6,9,8,6,3];
+  return Array.from({ length: 14 }, (_, row) => Array.from({ length: row < 9 ? 6 : 3 }, (_, i) => {
+    const col = row < 9 ? i : i + 3;
+    return { zoneId: row < 10 ? 'zone-packaged' : row < 13 ? 'zone-bulk' : 'zone-featured',
+      decorative: row < 9 && col % 2 === 1,
+      slot: slot(xs[col]!, -10.8 + row * 2.85, widths[col]! - (row % 2) * .4, 1.2) };
+  })).flat();
+}
+function householdSlots(): DisplaySlot[] {
+  return Array.from({ length: 30 }, (_, i) => slot(37 + i % 3 * 10, -3 + Math.floor(i / 3) * 3.3, 7 - i % 3 * .4, 1.5));
+}
+const HOUSEHOLD_BUSINESS_INDICES = new Set(Array.from({ length: 13 }, (_, i) => Math.floor(i * 29 / 12)));
+function customSlots(zoneId: string): DisplaySlot[] | undefined {
+  if (['zone-packaged','zone-bulk','zone-featured'].includes(zoneId)) return foodSlots().filter((s) => s.zoneId === zoneId && !s.decorative).map((s) => s.slot);
+  if (zoneId === 'zone-household') return householdSlots().filter((_, i) => HOUSEHOLD_BUSINESS_INDICES.has(i));
+  if (zoneId === 'zone-daily') return [-28,-19,-10].map((z) => slot(52,z,11,1.4));
+  if (zoneId === 'zone-seafood') return [slot(-53,-29,12,1.8),slot(-61,-24,5,1.8,Math.PI/2),slot(-61,-17,5,1.8,Math.PI/2),slot(-53,-14,12,1.8),slot(-52,-24,7,1.8),slot(-52,-19,7,1.8)];
+  if (zoneId === 'zone-meat') return [slot(-34,-29,15,1.8),slot(-42,-21.5,10,1.8,Math.PI/2),slot(-34,-14,15,1.8),slot(-33,-21,9,2.2)];
+  if (zoneId === 'zone-frozen') return [
+    ...[-17,-4,9,22].map((x) => slot(x,-29.6,11,2)),
+    ...[-12,12].flatMap((x) => [-23,-17].map((z) => slot(x,z,8,1.6))),
+    ...[-21,-3,3,25].map((x) => slot(x,-20,8,1.6,Math.PI/2)),
+  ];
+  return undefined;
+}
+
+/** Visual-only merchandising. Never append these IDs to operations layout or inventory state. */
+export function buildReferenceDisplayFixtures(layout: StoreLayout): Fixture[] {
+  if (layout.widthM !== 130 || layout.depthM !== 100) return [];
+  const descriptors = [
+    ...foodSlots().filter((s) => s.decorative).map((s) => ({ zoneId: s.zoneId, slot: s.slot })),
+    ...householdSlots().filter((_,i) => !HOUSEHOLD_BUSINESS_INDICES.has(i)).map((s) => ({ zoneId: 'zone-household', slot: s })),
+    ...[-25,-22,-16,-13].map((z) => ({ zoneId: 'zone-daily', slot: slot(52,z,11,1.4) })),
+    { zoneId: 'zone-daily', slot: slot(61,-19,20,1.4,Math.PI/2) },
+  ];
+  const displays = descriptors.map((d,i) => {
+    const template = layout.fixtures.find((f) => f.zoneId === d.zoneId);
+    if (!template) throw new Error(`${d.zoneId} 缺少图示陈列模板`);
+    return { ...template, ...d.slot, fixtureId: `reference-display-${d.zoneId}-${i}`, assetId: `reference-display-asset-${i}`, categoryIds: [], capacity: undefined, fixed: true };
+  });
+  const validation = validatePlanningLayout({ ...layout, fixtures: [...layout.fixtures,...displays] });
+  if (validation.issues.length) throw new Error(`补充陈列几何校验失败：${validation.issues.slice(0,3).join('；')}`);
+  return displays;
+}
+
 function geometry(f: Fixture): FixtureGeometry {
   return { x: f.x, z: f.z, rotationY: f.rotationY, widthM: f.widthM, depthM: f.depthM, heightM: f.heightM };
 }
@@ -106,6 +146,12 @@ export function generatePlanningLayout(source: StoreLayout): { layout: StoreLayo
     if (checkoutZones.includes(zone.zoneId)) continue;
     const members = input.fixtures.filter((f) => f.zoneId === zone.zoneId);
     if (members.length === 0) continue;
+    const custom = customSlots(zone.zoneId);
+    if (custom) {
+      if (custom.length !== members.length) throw new Error(`${zone.zoneId} 数量与参考排布不符`);
+      members.forEach((f,i) => placements.set(f.fixtureId, { ...f, ...custom[i]!, categoryIds: [...f.categoryIds] }));
+      continue;
+    }
     const grid = GRIDS[zone.zoneId];
     if (!grid) throw new Error(`${zone.zoneId} 无图片锚点，未生成候选`);
     const { bounds: b, columns, widthM, depthM } = grid;
@@ -151,6 +197,7 @@ export function generatePlanningLayout(source: StoreLayout): { layout: StoreLayo
       '候选设施尺寸及位置按图推定，完整尺寸差异列于 changes；原高度保留，fixed 设施移动仅供预览，需人工复核。',
       'F09 食品百货包含原 packaged/bulk/featured；F02 客服入口包含原 rest，未新建经营类别。',
       '24 台收银南侧靠右单横排，两组各 12 台，台长南北向；客服入口在南侧左方，仅为空间假设。',
+      'F09 按图近似 14 排、6 个不同架长的列，下段让出酒水；42 个业务架外补 27 个纯视觉架，乳品另补 5 柜，日化补 17 架，装饰不进入库存/业务状态。',
       '图片小字、准确货架数量、商品、门窗、消防疏散、加工冷库内部接驳无法可靠辨认；150 个代表设施并非逐件复刻图中物体。',
       '区域锚点为粗略语义范围，F09 外包范围与西南酒水范围部分交叠，但其实际设施分开布置；zone polygons 依实际设施包围区更新。',
       '验证边界、设施包围盒及至少 1m 几何间距；未验证消防、排队、顾客路径、冷链或经营效果，不再套用旧中央贯通通道假设。',
