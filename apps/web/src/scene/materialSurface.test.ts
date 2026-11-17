@@ -36,3 +36,11 @@ describe('original procedural surface pixels', () => {
     expect(buildSurfacePixels('wood', 16).color.byteLength).toBe(1024);
   });
 });
+
+it('draws subtle recessed tile grout without external floor imagery', () => {
+  const p = buildSurfacePixels('floorTile');
+  const middle = (32*64+32)*4;
+  expect(p.color[0]).toBeLessThan(p.color[middle]!);
+  expect(p.heightMap[0]).toBeLessThan(p.heightMap[middle]!);
+  expect(p.roughness[0]).toBeGreaterThan(p.roughness[middle]!);
+});
