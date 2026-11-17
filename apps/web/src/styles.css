@@ -944,3 +944,5 @@ code {
 .workbench .main.model-focused .scene-pane { flex: 1 1 100% !important; width: 100% !important; }
 .workbench .main.model-focused .agent-pane,
 .workbench .main.model-focused .workbench-split-handle { display: none !important; }
+
+.reference-checkout-number { background: #195c48; color: #fff; border-radius: 2px; padding: 1px 2px; font: 600 10px/1.15 sans-serif; white-space: nowrap; pointer-events: none; }
