@@ -1,7 +1,7 @@
 import type { Fixture } from '@yh/contracts';
 
 export type DetailPrimitive = 'box' | 'sphere';
-export type DetailMaterial = 'metal' | 'wood' | 'glass' | 'product' | 'label' | 'rubber';
+export type DetailMaterial = 'metal' | 'wood' | 'glass' | 'product' | 'label' | 'rubber' | 'produceBed';
 /** Unit boxes / diameter-1 spheres scaled by full size. Bottom-centred, Y-up local coordinates. */
 export interface DetailPart {
   id: string;
@@ -105,6 +105,7 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
               add(`sack-seam-${id}`, [x, bottom + height * .94, side * .24], [.30 / bays, height * .04, .11], theme.accent, 'wood');
             } else {
               add(`pack-box-${id}`, [x, bottom + height / 2, side * .24], [.70 / bays, height, .31], color, 'product');
+              if (theme.style === 'packaged' && level === 3) add(`package-stripe-${id}`, [x, bottom + height + .001, side * .24], [.20 / bays, .002, .27], COLORS.label, 'label');
             }
             const face = kind === 1 ? .343 : kind === 2 ? .357 : kind === 3 ? .378 : .398;
             add(`pack-label-${id}`, [x, bottom + height * .43, side * face], [.36 / bays, height * .30, .008], COLORS.label, 'label');
@@ -130,11 +131,18 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
         }
         // A low merchandise bed avoids empty black crates. Surface fruit is illustrative,
         // physically capped instead of growing to 40cm apples on wide inferred islands.
-        add(`${id}-produce-bed`, [x, .78, z], [.26, .045, .4], colorAt(FRUIT, row * 3 + col), 'product');
+        add(`${id}-produce-bed`, [x, .78, z], [.26, .045, .4], colorAt(FRUIT, row * 3 + col), 'produceBed');
         for (let n = 0; n < 24; n++) {
+          const variety = (row * 3 + col) % 3;
+          const scale = .78 + (n % 4) * .065;
           add(`${id}-fruit-${n}`, [x + (n % 6 - 2.5) * .043, .815 + (n % 2) * .012, z + (Math.floor(n / 6) - 1.5) * .095],
-            [Math.min(.035, .18 / f.widthM), Math.min(.09, .15 / f.heightM), Math.min(.075, .18 / f.depthM)],
+            [Math.min(.035, (variety === 1 ? .13 : .18) / f.widthM) * scale,
+              Math.min(.09, (variety === 2 ? .10 : .15) / f.heightM) * scale,
+              Math.min(.075, .18 / f.depthM) * scale],
             colorAt(FRUIT, row * 3 + col + (n % 7 === 0 ? 1 : 0)), 'product', 'sphere');
+        }
+        for (const edge of [-1, 1]) for (let slat = 0; slat < 2; slat++) {
+          add(`${id}-slat-${edge}-${slat}`, [x, .74 + slat*.06, z + edge*.224], [.28, .018, .012], '#a47c50', 'wood');
         }
         add(`${id}-price`, [x, .83, z + .225], [.12, .07, .008], COLORS.label, 'label');
       }
@@ -202,7 +210,24 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
       for (let col = 0; col < 4; col++) {
         const x = xAt(col, 4, .9);
         add(`tray-${col}`, [x, .62, 0], [.20, .045, .65], COLORS.dark);
-        add(`tray-food-${col}`, [x, .665, 0], [.17, .045, .55], colorAt(FRUIT, col), 'product');
+        const seafood = f.zoneId === 'zone-seafood', meat = f.zoneId === 'zone-meat';
+        const bakery = f.zoneId === 'zone-bakery';
+        // Generic illustrative food only: not SKUs or measured stock. Keep small items
+        // physically capped even when the inferred reference counter is unusually wide.
+        const bed = seafood ? '#dcebea' : meat ? '#eee0d8' : bakery ? '#ba8b53' : '#d7c090';
+        const food = seafood ? '#78999f' : meat ? '#bc6967' : bakery ? '#d5a65e' : '#a77b42';
+        add(`tray-food-${col}`, [x, .665, 0], [.17, .045, .55], bed, 'product');
+        for (let item = 0; item < 6; item++) {
+          const px = x + (item % 3 - 1) * .05;
+          const pz = (Math.floor(item / 3) - .5) * .25;
+          const sx = Math.min(.038, .45 / f.widthM), sz = Math.min(.19, .65 / f.depthM);
+          const sy = Math.min(.055, .10 / f.heightM);
+          add(`fresh-item-${col}-${item}`, [px, .69 + sy/2, pz], [sx, sy, sz], food, 'product', 'sphere');
+          if (seafood) add(`fish-tail-${col}-${item}`, [px, .70, pz + sz*.46], [sx*.8, sy*.3, sz*.23], '#96b3b6', 'product');
+          if (bakery) for (let score = 0; score < 2; score++) {
+            add(`bread-score-${col}-${item}-${score}`, [px, .69+sy, pz+(score-.5)*sz*.35], [sx*.55, sy*.10, sz*.07], '#f0d4a2', 'product');
+          }
+        }
         add(`tray-price-${col}`, [x, .67, .37], [.11, .07, .012], COLORS.label, 'label');
       }
       add('front-glass', [0, .80, .46], [.95, .37, .018], COLORS.glass, 'glass');

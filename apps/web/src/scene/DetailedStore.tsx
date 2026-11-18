@@ -9,7 +9,7 @@ import { buildReferenceArchitecture } from './referenceArchitecture';
 import { buildSurfacePixels, type SurfaceKind } from './materialSurface';
 
 interface Instance { part: DetailPart; fixture: DetailFixtureShape; selectable: boolean }
-const MATERIALS = ['metal', 'wood', 'glass', 'product', 'label', 'rubber'] as const;
+const MATERIALS = ['metal', 'wood', 'glass', 'product', 'label', 'rubber', 'produceBed'] as const;
 
 
 /** Shared per batch, not per item; no extra meshes, materials or draw calls. */
@@ -46,7 +46,7 @@ function Batch({ instances, primitive, material, onSelect }: {
   onSelect: (id: string) => void;
 }) {
   const ref = useRef<THREE.InstancedMesh>(null);
-  const surfaceKind: SurfaceKind | undefined = material === 'wood' ? 'wood' : material === 'metal' ? 'brushedMetal' : material === 'product' ? (primitive === 'sphere' ? 'produce' : 'packaging') : undefined;
+  const surfaceKind: SurfaceKind | undefined = material === 'produceBed' ? 'produceBed' : material === 'wood' ? 'wood' : material === 'metal' ? 'brushedMetal' : material === 'product' ? (primitive === 'sphere' ? 'produce' : 'packaging') : undefined;
   const surface = useSurfaceMaps(surfaceKind);
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -81,7 +81,7 @@ function Batch({ instances, primitive, material, onSelect }: {
         map={surface?.color ?? null}
         roughnessMap={surface?.roughness ?? null}
         bumpMap={surface?.bump ?? null}
-        bumpScale={material === 'wood' ? .012 : material === 'metal' ? .002 : .003}
+        bumpScale={material === 'produceBed' ? .045 : material === 'wood' ? .012 : material === 'metal' ? .002 : .003}
         roughness={surface ? 1 : material === 'glass' ? .18 : .78}
         metalness={material === 'metal' ? .48 : 0}
         transparent={material === 'glass'} opacity={material === 'glass' ? 0.25 : 1}

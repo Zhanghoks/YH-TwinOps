@@ -1,5 +1,5 @@
 /** Tiny original greyscale multipliers, never real packaging, brand artwork or product data. */
-export const SURFACE_KINDS = ['wood', 'brushedMetal', 'packaging', 'produce', 'floorTile'] as const;
+export const SURFACE_KINDS = ['wood', 'brushedMetal', 'packaging', 'produce', 'produceBed', 'floorTile'] as const;
 export type SurfaceKind = typeof SURFACE_KINDS[number];
 export interface SurfacePixels {
   width: number;
@@ -43,6 +43,17 @@ export function buildSurfacePixels(kind: SurfaceKind, size = 64): SurfacePixels 
       color = abstractMark ? 180 : label ? 250 : stripe ? 204 : 224 + n * 8;
       roughness = label ? 178 + n * 12 : 117 + n * 18;
       height = label ? 133 : 128;
+    } else if (kind === 'produceBed') {
+      // Original repeated mound relief under the bounded 3D surface pieces. This is
+      // illustrative produce mass, not an item count or photographic texture.
+      const row = Math.floor(v * 8);
+      const dx = ((u * 8 + (row % 2) * .5) % 1) - .5;
+      const dy = ((v * 8) % 1) - .5;
+      const radius = Math.sqrt(dx * dx + dy * dy);
+      const mound = Math.sqrt(Math.max(0, 1 - (radius / .48) ** 2));
+      color = 160 + mound * 88 + n * 7;
+      roughness = 185 + n * 18;
+      height = 70 + mound * 150;
     } else if (kind === 'floorTile') {
       const grout = x === 0 || y === 0;
       color = grout ? 204 : 245 + n * 8;

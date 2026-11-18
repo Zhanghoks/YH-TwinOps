@@ -176,3 +176,46 @@ describe('candidate beverage presentation', () => {
     }
   });
 });
+
+describe('fresh counter merchandising', () => {
+  it.each(['zone-seafood', 'zone-meat', 'zone-bakery', 'zone-deli'])('differentiates %s with bounded repeated food details', (zoneId) => {
+    for (const [widthM, depthM, heightM] of [[12, 2, 1.4], [.12,.08,.2]] as const) {
+      const f = fixture({fixtureType:'DELI_COUNTER', zoneId, widthM, depthM, heightM});
+      const before = structuredClone(f);
+      const parts = buildFixtureDetail(f);
+      const food = parts.filter(p => p.id.startsWith('fresh-item-'));
+      expect(food.length).toBeGreaterThan(8);
+      expect(parts.length).toBeLessThan(300);
+      for (const p of parts) {
+        expect(Math.abs(p.position[0])+p.size[0]/2).toBeLessThanOrEqual(widthM/2+1e-9);
+        expect(Math.abs(p.position[2])+p.size[2]/2).toBeLessThanOrEqual(depthM/2+1e-9);
+        expect(p.position[1]+p.size[1]/2).toBeLessThanOrEqual(heightM+1e-9);
+      }
+      expect(food.every(p=>p.size[0]<=.45 && p.size[2]<=.65)).toBe(true);
+      expect(f).toEqual(before);
+    }
+  });
+  it('uses distinct seafood ice, meat trays and bakery bread colours', () => {
+    const parts = (zoneId:string) => buildFixtureDetail(fixture({fixtureType:'DELI_COUNTER',zoneId}));
+    const bed = (zoneId:string) => parts(zoneId).find(p=>p.id==='tray-food-0')!.color;
+    expect(new Set(['zone-seafood','zone-meat','zone-bakery','zone-deli'].map(bed)).size).toBe(4);
+    expect(parts('zone-seafood').some(p=>p.id.startsWith('fish-tail-'))).toBe(true);
+    expect(parts('zone-bakery').some(p=>p.id.startsWith('bread-score-'))).toBe(true);
+  });
+});
+
+describe('produce and packaged shelf sample refinement', () => {
+  it('adds wooden crate slats and distinct bounded produce silhouettes without changing count', () => {
+    const p = buildFixtureDetail(fixture({fixtureType:'PRODUCE_ISLAND',widthM:7,depthM:3}));
+    expect(p.filter(x=>x.id.includes('-fruit-'))).toHaveLength(144);
+    expect(p.filter(x=>x.id.includes('-slat-'))).toHaveLength(24);
+    expect(new Set(p.filter(x=>x.id.includes('-fruit-')).map(x=>x.size.join(','))).size).toBeGreaterThan(3);
+    expect(p.length).toBeLessThan(300);
+  });
+  it('adds restrained top-shelf package stripes to food shelves, not all fixtures', () => {
+    const p = buildFixtureDetail(fixture({zoneId:'zone-packaged'}));
+    expect(p.filter(x=>x.id.startsWith('package-stripe-'))).toHaveLength(10);
+    expect(p.length).toBeLessThan(300);
+    expect(buildFixtureDetail(fixture({zoneId:'zone-household'})).some(x=>x.id.startsWith('package-stripe-'))).toBe(false);
+  });
+});

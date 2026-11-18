@@ -44,3 +44,9 @@ it('draws subtle recessed tile grout without external floor imagery', () => {
   expect(p.heightMap[0]).toBeLessThan(p.heightMap[middle]!);
   expect(p.roughness[0]).toBeGreaterThan(p.roughness[middle]!);
 });
+
+it('gives produce beds a repeated rounded merchandise relief rather than package labels', () => {
+  const bed = buildSurfacePixels('produceBed');
+  expect(bed.color).not.toEqual(buildSurfacePixels('packaging').color);
+  expect(Math.max(...bed.heightMap.filter((_,i)=>i%4===0))-Math.min(...bed.heightMap.filter((_,i)=>i%4===0))).toBeGreaterThan(100);
+});

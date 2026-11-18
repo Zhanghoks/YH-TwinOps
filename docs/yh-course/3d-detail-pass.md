@@ -160,3 +160,21 @@ Full typecheck/root/web tests and production build passed; existing bundle-size 
 ### Screenshot timestamp correction (2026-11-17)
 
 Earlier versions mistakenly labelled Firefox filename-local times as UTC. The cloud host uses `America/Los_Angeles`, PST (UTC−08:00) on this date. The preserved screenshot file modification timestamps, read explicitly with `TZ=UTC`, are 08:28:30, 08:39:42, 08:41:16, 08:49:27 and 09:00:10 UTC on 2026-11-17. These correspond exactly to filename times 00:28:30, 00:39:42, 00:41:16, 00:49:27 and 01:00:10 PST. The shared-copy birth timestamps are later, so they are not used as capture times. Capture/download timing is supported by the preserved file mtimes and observed Firefox save workflow, not an independently authenticated timestamp. The host's current UTC clock also agrees with the session clock. No screenshot bytes or rendering results were changed.
+
+## Fresh counter merchandising follow-up (2026-11-17)
+
+Compared the supplied flagship layout image with the previous 01:00:10 Firefox capture. Fresh counters still presented identical flat coloured tray blocks. `buildFixtureDetail` now adds bounded generic food silhouettes: seafood on a pale ice-coloured bed with tails, red meat portions, golden bakery pieces with scores, and warm deli portions. Twenty-four pieces per counter are decorative, not SKU or inventory counts. All existing fixture IDs, positions, dimensions, baseline/candidate geometry and business data remain unchanged. Individual pieces are capped at 0.45 m × 0.10 m × 0.65 m and stay inside the fixture envelope.
+
+Validation: `npm run check` passed (root 530 tests plus 3 Web tests), web production build passed with the existing large-chunk warning; `git diff --check` passed. Five new tests cover zone differentiation, geometry bounds, small/large dimensions and input immutability.
+
+Visual acceptance is NOT complete. The current cloud Chrome could not connect to the local preview URL. Existing Firefox was launched via the cloud desktop but showed a fresh first-run Terms of Use/Privacy Notice Continue screen, not the project. No new screenshot of this change was obtained, and no image-quality improvement is claimed as visually verified. This follow-up is left as an unstaged local diff on top of the pre-existing staged work; it has not been pushed, merged or deployed.
+
+## Produce and adjacent food sample pass (2026-11-18)
+
+The earlier preview blockage is resolved: the cloud desktop and command workspace use separate local networking. Serving the built files with Python from the cloud desktop terminal allowed the existing Firefox workflow to display the actual app. Optional browser telemetry was left off. No user's Mac was used.
+
+Against the supplied concept image, produce islands now have 24 crate slats, varied bounded fruit silhouettes, and an original shared produce-bed colour/roughness/relief texture. The first actual preview still looked sparse, so repeated small mound relief was added without multiplying fixture objects. Adjacent packaged-food shelves gained narrow top-row label stripes. The earlier fresh-counter food pieces are included in this pass. No fixture IDs, business data, approved baseline layout or inventory counts changed.
+
+Final validation: `npm run check` passed (56 root files / 533 tests plus 3 web tests); production build passed with the existing large-chunk warning. The focused geometry/material suite passed 34 tests. Actual Firefox candidate top and oblique close views were inspected and downloaded: `Screenshot 2026-11-17 at 23-59-03 YH-TwinOps 全店运营工作台（合成教学演示）.png` (top) and `Screenshot 2026-11-18 at 00-02-46 YH-TwinOps 全店运营工作台（合成教学演示）.png` (produce/food near view). These are literal browser filenames, not asserted UTC timestamps. Their unedited PNGs are kept in the cloud QA artifact directory, not bundled into the app.
+
+The final views show denser produce surfaces and distinct packaged shelving while retaining the existing circulation gaps. Remaining differences include repetitive procedural contents, low-poly silhouettes and simplified lighting/materials. This is a sample improvement, not photorealistic or exact source reconstruction. No FPS benchmark or full approval E2E rerun. The previous section's no-screenshot/no-push statement records its earlier state and is superseded by this validation.
