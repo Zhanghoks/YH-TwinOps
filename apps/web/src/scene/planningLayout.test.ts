@@ -1,0 +1,189 @@
+import { describe, expect, it } from 'vitest';
+import { parseStoreLayout } from '@yh/contracts';
+import { layout as baseline } from '../data';
+import { generatePlanningLayout, validatePlanningLayout } from './planningLayout';
+
+describe('image-reference planning candidate', () => {
+  it('is deterministic, schema-valid, and never edits the baseline', () => {
+    const before = JSON.stringify(baseline);
+    const result = generatePlanningLayout(baseline);
+    expect(result).toEqual(generatePlanningLayout(baseline));
+    expect(JSON.stringify(baseline)).toBe(before);
+    expect(parseStoreLayout(result.layout)).toEqual(result.layout);
+    expect([result.layout.widthM, result.layout.depthM]).toEqual([130, 100]);
+  });
+
+  it('preserves all fixture IDs, zone IDs and business metadata while disclosing inferred dimensions', () => {
+    const { layout, report } = generatePlanningLayout(baseline);
+    expect(layout.fixtures).toHaveLength(150);
+    expect(layout.zones.map((z) => z.zoneId)).toEqual(baseline.zones.map((z) => z.zoneId));
+    layout.fixtures.forEach((f, i) => {
+      const original = baseline.fixtures[i]!;
+      expect({ ...f, x: original.x, z: original.z, rotationY: original.rotationY, widthM: original.widthM, depthM: original.depthM, heightM: original.heightM }).toEqual(original);
+    });
+    expect(report.referenceRegions.map((r) => r.code)).toEqual(['F01','F02','F03','F04','F05','F06','F07','F08','F09','F10','F11','F12','BACK']);
+    expect(report.dimensionChangedFixtureCount).toBeGreaterThan(0);
+    expect(report.changes.every((c) => c.from.widthM > 0 && c.to.depthM > 0)).toBe(true);
+    expect(report.notes.join('')).toContain('非实测');
+    expect(report).not.toHaveProperty('crossAisle');
+    expect(report).not.toHaveProperty('centralAisleWidthM');
+  });
+
+  it('keeps footprints in bounds, without overlap and at least 1m apart', () => {
+    const { layout } = generatePlanningLayout(baseline);
+    expect(validatePlanningLayout(layout).issues).toEqual([]);
+    expect(validatePlanningLayout(layout).minimumGapM).toBeGreaterThanOrEqual(1);
+  });
+
+  it('places 24 north-south checkouts in one southern row, two groups of 12', () => {
+    const { layout } = generatePlanningLayout(baseline);
+    const checkouts = layout.fixtures.filter((f) => f.fixtureType === 'CHECKOUT').sort((a,b) => a.x-b.x);
+    expect(checkouts).toHaveLength(24);
+    expect(new Set(checkouts.map((f) => f.z)).size).toBe(1);
+    checkouts.forEach((f) => { expect(f.z).toBeGreaterThan(34); expect(f.depthM).toBeGreaterThan(f.widthM * 3); expect(f.rotationY).toBe(0); });
+    expect(checkouts[12]!.x - checkouts[11]!.x - checkouts[11]!.widthM).toBe(4);
+    expect(checkouts[0]!.x - checkouts[0]!.widthM / 2).toBe(-2);
+    expect(checkouts[23]!.x + checkouts[23]!.widthM / 2).toBe(60);
+  });
+
+  it('maps all fixtures to their image-reference region and enclosed candidate zone polygon', () => {
+    const { layout, report } = generatePlanningLayout(baseline);
+    for (const zone of layout.zones) {
+      const region = report.referenceRegions.find((r) => r.zoneIds.includes(zone.zoneId));
+      expect(region).toBeDefined();
+      const xs = zone.polygonM!.map((p) => p[0]), zs = zone.polygonM!.map((p) => p[1]);
+      for (const original of layout.fixtures.filter((f) => f.zoneId === zone.zoneId)) {
+        const c = Math.abs(Math.cos(original.rotationY)), sn = Math.abs(Math.sin(original.rotationY));
+        const f = { ...original, widthM: c * original.widthM + sn * original.depthM, depthM: sn * original.widthM + c * original.depthM };
+        expect(f.x - f.widthM / 2).toBeGreaterThanOrEqual(Math.max(region!.bounds.x0, Math.min(...xs)) - 1e-8);
+        expect(f.x + f.widthM / 2).toBeLessThanOrEqual(Math.min(region!.bounds.x1, Math.max(...xs)) + 1e-8);
+        expect(f.z - f.depthM / 2).toBeGreaterThanOrEqual(Math.max(region!.bounds.z0, Math.min(...zs)) - 1e-8);
+        expect(f.z + f.depthM / 2).toBeLessThanOrEqual(Math.min(region!.bounds.z1, Math.max(...zs)) + 1e-8);
+      }
+    }
+  });
+
+  it('reserves the coordinated rear storage footprint and keeps entry approach clear', () => {
+    const { layout } = generatePlanningLayout(baseline);
+    for (const f of layout.fixtures.filter((f) => f.zoneId === 'zone-backroom')) {
+      expect(f.x - f.widthM / 2).toBeGreaterThanOrEqual(-14);
+      expect(f.x + f.widthM / 2).toBeLessThanOrEqual(12);
+      expect(f.z - f.depthM / 2).toBeGreaterThanOrEqual(-43);
+      expect(f.z + f.depthM / 2).toBeLessThanOrEqual(-37);
+    }
+    for (const f of layout.fixtures) {
+      const entersApproach = f.x + f.widthM / 2 > -34 && f.x - f.widthM / 2 < -11 && f.z + f.depthM / 2 > 43;
+      expect(entersApproach).toBe(false);
+    }
+  });
+
+  it('does not enforce the superseded central aisle and detects invalid pairs', () => {
+    const { layout } = generatePlanningLayout(baseline);
+    expect(layout.fixtures.some((f) => f.x - f.widthM / 2 < 2 && f.x + f.widthM / 2 > -2)).toBe(true);
+    const bad = structuredClone(layout);
+    bad.fixtures[1]!.x = bad.fixtures[0]!.x; bad.fixtures[1]!.z = bad.fixtures[0]!.z;
+    expect(validatePlanningLayout(bad).issues.some((i) => i.includes('间距'))).toBe(true);
+  });
+});
+
+describe('reference merchandising density', () => {
+  it('adds non-business displays and fills 14 mixed-length F09 rows without collisions', async () => {
+    const { buildReferenceDisplayFixtures } = await import('./planningLayout');
+    const { layout } = generatePlanningLayout(baseline);
+    const before = JSON.stringify(layout);
+    const displays = buildReferenceDisplayFixtures(layout);
+    expect(JSON.stringify(layout)).toBe(before);
+    expect(displays).toEqual(buildReferenceDisplayFixtures(layout));
+    expect(displays.every((f) => f.fixtureId.startsWith('reference-display-'))).toBe(true);
+    expect(displays.every((f) => f.categoryIds.length === 0 && f.capacity === undefined)).toBe(true);
+    expect(buildReferenceDisplayFixtures(baseline)).toEqual([]);
+    expect(new Set([...layout.fixtures,...displays].map((f) => f.fixtureId)).size).toBe(150+displays.length);
+    expect(validatePlanningLayout({...layout, fixtures:[...layout.fixtures,...displays]}).issues).toEqual([]);
+    const food = [...layout.fixtures,...displays].filter((f) => ['zone-packaged','zone-bulk','zone-featured'].includes(f.zoneId));
+    expect(food).toHaveLength(69);
+    expect(new Set(food.map((f) => f.z)).size).toBe(14);
+    expect(new Set(food.map((f) => f.widthM)).size).toBeGreaterThanOrEqual(4);
+    expect(displays.filter((f) => f.zoneId === 'zone-daily')).toHaveLength(5);
+    expect([...layout.fixtures,...displays].filter((f) => f.zoneId === 'zone-household')).toHaveLength(30);
+  });
+
+  it('uses perimeter and island arrangements in fresh food and combined freezer orientations', () => {
+    const { layout } = generatePlanningLayout(baseline);
+    for (const zoneId of ['zone-seafood','zone-meat','zone-frozen']) {
+      const fs = layout.fixtures.filter((f) => f.zoneId === zoneId);
+      expect(fs.some((f) => f.rotationY === Math.PI/2)).toBe(true);
+      expect(fs.some((f) => f.rotationY === 0)).toBe(true);
+    }
+    const top = layout.fixtures.filter((f) => f.zoneId === 'zone-frozen' && f.z < -28);
+    expect(top).toHaveLength(4);
+    expect(top.every((f) => f.widthM === 11)).toBe(true);
+  });
+});
+
+describe('fresh departments follow the reference silhouette', () => {
+  it('uses staggered varied produce islands and diagonal edge displays', () => {
+    const { layout } = generatePlanningLayout(baseline);
+    const produce = layout.fixtures.filter((f) => f.zoneId === 'zone-produce');
+    expect(produce).toHaveLength(15);
+    expect(produce.filter((f) => f.rotationY !== 0)).toHaveLength(3);
+    expect(new Set(produce.map((f) => f.widthM)).size).toBeGreaterThan(3);
+    expect(new Set(produce.filter((f) => f.rotationY === 0).map((f) => f.x)).size).toBeGreaterThan(3);
+  });
+  it('adds limited perimeter produce and deli displays, not operational objects', async () => {
+    const { buildReferenceDisplayFixtures } = await import('./planningLayout');
+    const { layout } = generatePlanningLayout(baseline);
+    const displays = buildReferenceDisplayFixtures(layout);
+    expect(displays).toHaveLength(55);
+    const { report } = generatePlanningLayout(baseline);
+    for (const f of displays) {
+      const region = report.referenceRegions.find((r) => r.zoneIds.includes(f.zoneId))!;
+      const c = Math.abs(Math.cos(f.rotationY)), sn = Math.abs(Math.sin(f.rotationY));
+      const w = c*f.widthM+sn*f.depthM, d = sn*f.widthM+c*f.depthM;
+      expect(f.x-w/2).toBeGreaterThanOrEqual(region.bounds.x0-1e-8);
+      expect(f.x+w/2).toBeLessThanOrEqual(region.bounds.x1+1e-8);
+      expect(f.z-d/2).toBeGreaterThanOrEqual(region.bounds.z0-1e-8);
+      expect(f.z+d/2).toBeLessThanOrEqual(region.bounds.z1+1e-8);
+    }
+    expect(displays.filter((f) => f.zoneId === 'zone-produce')).toHaveLength(2);
+    expect(displays.filter((f) => f.zoneId === 'zone-deli')).toHaveLength(2);
+    for (const id of ['zone-deli','zone-bakery']) {
+      expect(layout.fixtures.filter((f) => f.zoneId === id && f.rotationY === Math.PI/2).length).toBeGreaterThanOrEqual(2);
+    }
+    expect(validatePlanningLayout({...layout, fixtures:[...layout.fixtures,...displays]}).issues).toEqual([]);
+  });
+});
+
+describe('remaining reference perimeter refinements', () => {
+  it('closes east-side fresh-counter silhouettes without joining business state', async () => {
+    const { buildReferenceDisplayFixtures } = await import('./planningLayout');
+    const { layout } = generatePlanningLayout(baseline);
+    const displays = buildReferenceDisplayFixtures(layout);
+    expect(displays).toHaveLength(55);
+    for (const id of ['zone-seafood','zone-meat']) {
+      const edge = displays.filter((f) => f.zoneId === id);
+      expect(edge).toHaveLength(1);
+      expect(edge[0]!.rotationY).toBe(Math.PI/2);
+    }
+    expect(validatePlanningLayout({...layout, fixtures:[...layout.fixtures,...displays]}).issues).toEqual([]);
+    const produce = layout.fixtures.filter((f) => f.zoneId === 'zone-produce' && f.rotationY === 0 && f.z < 25);
+    expect(produce.every((f) => f.depthM >= 4.4)).toBe(true);
+  });
+});
+
+it('preserves a 4m packaged/household seam including decorative display geometry', async () => {
+  const { buildReferenceDisplayFixtures } = await import('./planningLayout');
+  const { buildFixtureDetail } = await import('./detailGeometry');
+  const { layout } = generatePlanningLayout(baseline);
+  const all = [...layout.fixtures, ...buildReferenceDisplayFixtures(layout)];
+  const edges = (zoneId: string) => all.filter(f => f.zoneId === zoneId).flatMap(f =>
+    buildFixtureDetail(f).map(p => {
+      const c = Math.cos(f.rotationY), s = Math.sin(f.rotationY);
+      const x = f.x + p.position[0] * c + p.position[2] * s;
+      const half = (Math.abs(c) * p.size[0] + Math.abs(s) * p.size[2]) / 2;
+      expect(Math.abs(p.position[0]) + p.size[0] / 2).toBeLessThanOrEqual(f.widthM / 2 + 1e-8);
+      expect(Math.abs(p.position[2]) + p.size[2] / 2).toBeLessThanOrEqual(f.depthM / 2 + 1e-8);
+      return [x-half,x+half];
+    }));
+  const food = edges('zone-packaged'), home = edges('zone-household');
+  expect(Math.min(...home.map(e=>e[0]!)) - Math.max(...food.map(e=>e[1]!))).toBeGreaterThanOrEqual(4 - 1e-8);
+});

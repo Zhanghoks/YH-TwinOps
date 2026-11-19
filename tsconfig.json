@@ -12,6 +12,7 @@
     "apps/simulator/**",
     "apps/associate/**",
     "packages/yard/**",
-    "packages/overlap-audit/**"
+    "packages/overlap-audit/**",
+    "apps/web/**"
   ]
 }

@@ -1,13 +1,19 @@
-/**
- * 全店 3D 场景：StoreLayout 数据驱动的运营视图。
- * 两种视觉模式（spec US-15：布局唯一事实源是 StoreLayout，模型只是皮，业务 ID 不变）：
- * - shell 模式：登记台账 approved 的整店外壳 GLB（yh-large-concept，节点名前缀=设施 id）；
- *   分区平面退化为半透明数据叠加层，点击外壳网格按节点名拾取设施。
- * - 白膜模式：没有可用外壳时，按 fixtureType 语义化白膜盒体渲染（默认回退）。
- */
-import { Suspense, useMemo } from 'react';
+import { StoreCustomers } from './StoreCustomers';
+import { DepartmentFloor } from './DepartmentFloor';
+import { useCityGroundTexture } from './CityGround';
+import { CityTraffic } from './CityTraffic';
+import { WeatherScene } from './WeatherScene';
+import { WEATHER_PRESETS,type SimulatedWeather } from './weatherModel';
+import { buildComponentSample, type ComponentSampleId } from './componentCatalog';
+import { buildReferenceCheckoutSigns } from './referenceSignage';
+import { REFERENCE_SERVICE_LABELS } from './referenceArchitecture';
+import { buildReferenceDisplayFixtures, type ReferenceRegion } from './planningLayout';
+/** StoreLayout-driven single-canvas scene; procedural detail never changes business geometry. */
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { buildEntranceSiteCamera, buildSceneCamera, fitTopViewHeight, type CameraView } from './sceneCamera';
+import { DetailedFixtures, StoreEnvelope } from './DetailedStore';
 import * as THREE from 'three';
-import { Canvas, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Html, OrbitControls, useGLTF } from '@react-three/drei';
 import { isDecisionUsable, METRICS, type Fixture, type StoreLayout, type TwinSnapshot, type ZoneState } from '@yh/contracts';
 import { useWorkbench, type ViewLayer } from '../state';
@@ -17,6 +23,40 @@ export interface AssetManifest {
   approved: Map<string, string>;
   /** 整店外壳 GLB URL（role=store-shell 且 approved）；缺省时走白膜模式。 */
   shellUrl?: string;
+}
+
+/** One extra demand frame after camera/HTML mounts, without a permanent render loop. */
+function SettleView({ revision }: { revision: string }) {
+  const invalidate = useThree((state) => state.invalidate);
+  useEffect(() => {
+    let second = 0;
+    const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => invalidate()); });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, [invalidate, revision]);
+  return null;
+}
+
+/** Candidate top view refits on focus-mode/window resize, not on every animation frame. */
+function FitReferenceTop({ width, depth, center }: { width: number; depth: number; center: readonly [number, number] }) {
+  const { camera, size, invalidate } = useThree();
+  useEffect(() => {
+    camera.position.set(center[0], fitTopViewHeight(width, depth, size.width, size.height), center[1] + .1);
+    camera.lookAt(center[0], 0, center[1]);
+    camera.updateProjectionMatrix();
+    invalidate();
+  }, [camera, size.width, size.height, width, depth, center[0], center[1], invalidate]);
+  return null;
+}
+
+/** Mount DOM annotations only after the new camera and controls have settled. */
+function ReadyLabels({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let second = 0;
+    const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => setReady(true)); });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, []);
+  return ready ? <>{children}</> : null;
 }
 
 const WHITE = '#eceff1';
@@ -37,6 +77,8 @@ function trafficColor(value: number): string {
   if (value > 40) return '#fcd34d';
   return '#bbf7d0';
 }
+
+export type SceneMode = 'detail' | 'shell' | 'white';
 
 interface LayerColors {
   zoneFill: (zone: ZoneState) => string;
@@ -240,6 +282,7 @@ function ShellModel({ url, onSelect }: { url: string; onSelect: (id: string | nu
 
 function ZoneNode({
   zone,
+  name,
   rect,
   fill,
   badge,
@@ -248,6 +291,7 @@ function ZoneNode({
   onSelect,
 }: {
   zone: ZoneState;
+  name: string;
   rect: readonly [number, number, number, number];
   fill: string;
   badge: string;
@@ -270,22 +314,26 @@ function ZoneNode({
         <planeGeometry args={[x1 - x0, z1 - z0]} />
         <meshBasicMaterial color={fill} transparent opacity={opacity} depthWrite={false} />
       </mesh>
-      <Html position={[cx, shellMode ? 2.6 : 0.6, cz]} center distanceFactor={55} zIndexRange={[10, 0]}>
-        <div className="zone-label" style={{ pointerEvents: 'none' }}>
-          <strong>{zone.zoneId.replace('zone-', '')}</strong>
+      {name !== '' && <Html position={[cx, shellMode ? 2.6 : 0.6, cz]} center zIndexRange={[10, 0]}>
+        <div className={`zone-label${selected ? ' is-selected' : ''}`} style={{ pointerEvents: 'none' }}>
+          <strong>{name.split(' / ')[0]}</strong>
           {badge !== '' && <span>{badge}</span>}
         </div>
-      </Html>
+      </Html>}
     </group>
   );
 }
 
-export function Scene({ snapshot, layout, manifest }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest }) {
+export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, referenceRegions, componentId, weather = 'sunny', reducedMotion = false, cityPaused = false, cloudQuality = 'low', economy = true, showCustomers = true, customersPaused = false, operatingOccupancy, operatingOccupancyLabel = '平均在场估算', active = true, stocked = true }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; referenceRegions?: ReferenceRegion[]; componentId?: ComponentSampleId; weather?: SimulatedWeather; reducedMotion?: boolean; cityPaused?: boolean; cloudQuality?: 'off'|'low'|'high'; economy?: boolean; showCustomers?: boolean; customersPaused?: boolean; operatingOccupancy?: Record<string,number>; operatingOccupancyLabel?: string; active?: boolean; stocked?: boolean }) {
   const layer = useWorkbench((s) => s.layer);
   const selection = useWorkbench((s) => s.selection);
   const select = useWorkbench((s) => s.select);
   const colors = layerColors(layer);
-  const shellMode = manifest.shellUrl !== undefined;
+  const shellMode = mode === 'shell' && manifest.shellUrl !== undefined;
+  const detailed = mode === 'detail';
+  // These image-inferred shelves are visual skins only; never enter snapshot or selection.
+  const checkoutSigns = useMemo(() => referenceRegions ? buildReferenceCheckoutSigns(layout.fixtures) : [], [layout, referenceRegions]);
+  const referenceDisplays = useMemo(() => referenceRegions ? buildReferenceDisplayFixtures(layout) : [], [layout, referenceRegions]);
   const zoneById = useMemo(() => Object.fromEntries(Object.values(snapshot.zones).map((z) => [z.zoneId, z])), [snapshot]);
 
   const zoneRects = useMemo(
@@ -303,31 +351,67 @@ export function Scene({ snapshot, layout, manifest }: { snapshot: TwinSnapshot; 
 
   // 布局坐标为居中原点（老概念店坐标系）或角点坐标系（生成布局）：地面中心随之取齐。
   const groundCenter = useMemo(() => {
+    if (fixedCenter) return fixedCenter;
     const rects = [...zoneRects.values()];
     if (rects.length === 0) return [layout.widthM / 2, layout.depthM / 2] as const;
     const xs = rects.flatMap((r) => [r[0], r[2]]);
     const zs = rects.flatMap((r) => [r[1], r[3]]);
     return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2] as const;
-  }, [zoneRects, layout]);
+  }, [zoneRects, layout, fixedCenter]);
 
+  const [cityMetrics,setCityMetrics]=useState('采样中');
+  const cityGround = useCityGroundTexture(layout.widthM,layout.depthM);
+  const distantGround = useCityGroundTexture(layout.widthM,layout.depthM,true);
+  const sample = useMemo(() => componentId ? buildComponentSample(componentId) : undefined, [componentId]);
+  const lighting=WEATHER_PRESETS[sample ? 'sunny' : weather];
+  const sampleSpan = sample ? Math.max(sample.widthM, sample.depthM, sample.heightM) : 1;
+  const camera = sample ? { position: [sampleSpan*1.65, sampleSpan*1.15, sampleSpan*1.65] as [number, number, number], target: [0, sample.heightM*.45, 0] as [number, number, number] } : referenceRegions && cameraView === 'entrance' ? buildEntranceSiteCamera(groundCenter,layout.depthM,-22.5) : buildSceneCamera(cameraView, groundCenter, layout.depthM, layout.widthM);
   return (
-    <Canvas camera={{ position: [shellMode ? 46 : 50, 58, shellMode ? 74 : 118], fov: 42 }} dpr={[1, 2]}>
-      <color attach="background" args={['#f5f7fa']} />
+    <><Canvas className="scene-canvas" key={`${componentId ?? "store"}-${cameraView}-${cameraRevision}`} shadows={!economy} frameloop={active ? "demand" : "never"} camera={{ position: camera.position, fov: 42, near: .5, far: 1000 }} dpr={economy ? .85 : [1, 1.5]}>
+      <SettleView revision={`${cameraView}-${cameraRevision}-${showLabels}-${!!referenceRegions}`} />
+      <color attach="background" args={['#e8eceb']} />
+      {!sample&&<fog attach="fog" args={[lighting.horizon,cameraView==='site'?500:350,900]}/>}
+      {!sample && <WeatherScene cloudQuality={cloudQuality} weather={weather} width={layout.widthM} depth={layout.depthM} center={groundCenter} reducedMotion={reducedMotion} />}
+      {!sample && <CityTraffic width={layout.widthM} depth={layout.depthM} center={groundCenter} paused={cityPaused} onMetrics={setCityMetrics} />}
       {/* shell 模型自带较暗的烘焙色调，光照对齐老原型的强度口径 */}
-      <hemisphereLight args={['#e5fff0', '#34413e', shellMode ? 2.1 : 0.9]} />
-      <directionalLight position={[30, 70, 35]} intensity={shellMode ? 2.1 : 0.9} color="#fff3d6" />
-      <OrbitControls target={[groundCenter[0], 0, groundCenter[1]]} maxPolarAngle={Math.PI / 2.05} minDistance={12} maxDistance={220} />
+      <hemisphereLight args={[shellMode ? '#e5fff0' : '#fff3d9', shellMode ? '#34413e' : '#56615c', shellMode ? 2.1 : lighting.ambient]} />
+      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : lighting.sun} color={lighting.sunColor} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={referenceRegions ? -75 : -60} shadow-camera-right={referenceRegions ? 75 : 60} shadow-camera-top={referenceRegions ? 75 : 60} shadow-camera-bottom={referenceRegions ? -75 : -60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
+      <OrbitControls target={camera.target} maxPolarAngle={Math.PI / 2.05} minDistance={sample ? 1 : 5} maxDistance={Math.max(220, layout.depthM * 4)} />
+      {!sample && referenceRegions && cameraView === 'top' && <FitReferenceTop width={layout.widthM} depth={layout.depthM} center={groundCenter} />}
 
+      {sample && <>
+        <DetailedFixtures stocked={stocked} fixtures={[]} decorations={[sample]} onSelect={() => {}} />
+        <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.015,0]} receiveShadow><planeGeometry args={[12,12]}/><meshStandardMaterial color="#e5e1d8" /></mesh>
+      </>}
+      {!sample && <>
       {/* 地面（白膜模式）与取消选择热区 */}
-      <mesh position={[groundCenter[0], -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
-        <planeGeometry args={[layout.widthM + 40, layout.depthM + 40]} />
-        <meshStandardMaterial color={shellMode ? '#cfd6dd' : '#dee3e9'} />
+      <mesh position={[groundCenter[0],-.4,groundCenter[1]]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[layout.widthM+900,layout.depthM+900]}/><meshLambertMaterial map={distantGround}/></mesh>
+      <mesh position={[groundCenter[0], detailed ? -0.25 : -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
+        <planeGeometry args={[layout.widthM + 260, layout.depthM + 300]} />
+        <meshStandardMaterial map={cityGround} color={shellMode ? '#cfd6dd' : '#ffffff'} />
       </mesh>
-      {!shellMode && (
+      {!shellMode && !detailed && (
         <gridHelper args={[layout.widthM, layout.widthM / 2, '#c4ccd4', '#d8dee4']} position={[groundCenter[0], 0.005, groundCenter[1]]} />
       )}
 
       {shellMode && <ShellModel url={manifest.shellUrl as string} onSelect={(id) => (id === null ? select(null) : select({ kind: 'fixture', id }))} />}
+
+      {detailed && <>
+        {referenceRegions&&<DepartmentFloor regions={referenceRegions}/>}
+        <StoreEnvelope layout={layout} center={groundCenter} reference={!!referenceRegions} />
+        {showCustomers && <StoreCustomers layout={layout} decorations={referenceDisplays} paused={customersPaused} />}
+        <DetailedFixtures stocked={stocked} compactFaces={economy} fixtures={layout.fixtures} decorations={referenceDisplays} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
+      </>}
+
+      <ReadyLabels>
+      {referenceRegions && showLabels && layer === 'none' && checkoutSigns.map((sign) => <Html wrapperClass="reference-html-anchor" key={`sign-${sign.fixtureId}`} position={sign.position} center zIndexRange={[8,0]}><span className="reference-checkout-number" aria-label={`图示收银通道 ${sign.text}，非业务编号`}>{sign.text}</span></Html>)}
+      {referenceRegions && showLabels && layer === 'none' && referenceRegions.filter((region) => region.code !== 'BACK').map((region) => <Html wrapperClass="reference-html-anchor" key={region.code} position={[(region.bounds.x0 + region.bounds.x1) / 2, 3, (region.bounds.z0 + region.bounds.z1) / 2]} center zIndexRange={[10, 0]}>
+        <div className="zone-label reference-label"><strong>{region.label}</strong><span>{region.code === 'BACK' ? '参考图后勤带' : region.code} · 图面分区</span></div>
+      </Html>)}
+
+      {referenceRegions && showLabels && layer === 'none' && REFERENCE_SERVICE_LABELS.filter((item) => item.id !== 'service' && item.id !== 'entry').map((item) => <Html wrapperClass="reference-html-anchor" key={item.id} position={[...item.position]} center zIndexRange={[10, 0]}><div className="zone-label reference-label"><strong>{item.id === 'chilled' ? '冷藏' : item.id === 'frozen' ? '冷冻' : item.text}</strong><span>图面推定</span></div></Html>)}
+
+      </ReadyLabels>
 
       {/* 分区数据叠加层与标签 */}
       {layout.zones.map((z) => {
@@ -338,18 +422,19 @@ export function Scene({ snapshot, layout, manifest }: { snapshot: TwinSnapshot; 
           <ZoneNode
             key={z.zoneId}
             zone={state}
+            name={showLabels && (!referenceRegions || layer !== 'none') ? z.name : ''}
             rect={rect}
-            fill={colors.zoneFill(state)}
-            badge={colors.zoneBadge(state)}
+            fill={layer === 'traffic' && operatingOccupancy ? trafficColor(operatingOccupancy[z.zoneId] ?? 0) : colors.zoneFill(state)}
+            badge={layer === 'traffic' && operatingOccupancy ? `${operatingOccupancyLabel} ${operatingOccupancy[z.zoneId] ?? 0} 人（合成）` : colors.zoneBadge(state)}
             selected={selection?.kind === 'zone' && selection.id === z.zoneId}
-            shellMode={shellMode}
+            shellMode={shellMode || detailed}
             onSelect={(id) => select({ kind: 'zone', id })}
           />
         );
       })}
 
       {/* 白膜模式的设施渲染（shell 模式下设施视觉来自外壳模型，点击拾取走节点名） */}
-      {!shellMode &&
+      {!shellMode && !detailed &&
         layout.fixtures.map((f) => (
           <FixtureNode
             key={f.fixtureId}
@@ -360,11 +445,9 @@ export function Scene({ snapshot, layout, manifest }: { snapshot: TwinSnapshot; 
           />
         ))}
 
-      <Html position={[groundCenter[0] - layout.widthM / 2 + 8, 1, groundCenter[1] + layout.depthM / 2 + 9]} center zIndexRange={[10, 0]}>
-        <div className="store-caption" style={{ pointerEvents: 'none' }}>
-          合成教学压测布局 {layout.widthM}×{layout.depthM} m（非真实门店测量）
-        </div>
-      </Html>
+
+      </>}
     </Canvas>
+    {!sample&&<div style={{position:"absolute",pointerEvents:"none",zIndex:22,right:16,top:170,background:"#fffdf1e8",padding:"4px 8px",fontSize:11,color:"#40534c"}}>城市模拟 · {cityPaused?"已静止":cityMetrics}（当前视角实测，非 GPU 耗时）</div>}</>
   );
 }
