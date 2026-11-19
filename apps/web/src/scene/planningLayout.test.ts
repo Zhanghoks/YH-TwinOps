@@ -169,3 +169,21 @@ describe('remaining reference perimeter refinements', () => {
     expect(produce.every((f) => f.depthM >= 4.4)).toBe(true);
   });
 });
+
+it('preserves a 4m packaged/household seam including decorative display geometry', async () => {
+  const { buildReferenceDisplayFixtures } = await import('./planningLayout');
+  const { buildFixtureDetail } = await import('./detailGeometry');
+  const { layout } = generatePlanningLayout(baseline);
+  const all = [...layout.fixtures, ...buildReferenceDisplayFixtures(layout)];
+  const edges = (zoneId: string) => all.filter(f => f.zoneId === zoneId).flatMap(f =>
+    buildFixtureDetail(f).map(p => {
+      const c = Math.cos(f.rotationY), s = Math.sin(f.rotationY);
+      const x = f.x + p.position[0] * c + p.position[2] * s;
+      const half = (Math.abs(c) * p.size[0] + Math.abs(s) * p.size[2]) / 2;
+      expect(Math.abs(p.position[0]) + p.size[0] / 2).toBeLessThanOrEqual(f.widthM / 2 + 1e-8);
+      expect(Math.abs(p.position[2]) + p.size[2] / 2).toBeLessThanOrEqual(f.depthM / 2 + 1e-8);
+      return [x-half,x+half];
+    }));
+  const food = edges('zone-packaged'), home = edges('zone-household');
+  expect(Math.min(...home.map(e=>e[0]!)) - Math.max(...food.map(e=>e[1]!))).toBeGreaterThanOrEqual(4 - 1e-8);
+});

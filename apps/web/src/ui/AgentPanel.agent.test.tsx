@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createAgent } from '@ui-sdk/react/agent';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -52,7 +52,9 @@ describe('门店助手对话框（ui-sdk agent-ready）', () => {
     const labels = components.map((entry) => entry.label);
     expect(labels, '向门店助手提问 is missing').toContain('向门店助手提问');
     expect(labels, '提问 is missing').toContain('提问');
-    expect(labels.some((l) => l?.includes('调 3 人支援收银行不行')), '预设提问 missing').toBe(true);
+    expect(labels.some((l) => l?.includes('人员支援')), '预设提问 missing').toBe(true);
+    expect(screen.getByText('合成教学数据')).toBeTruthy();
+    expect(screen.getByText('建议与推演，不直接执行门店操作')).toBeTruthy();
 
     const result = await agent.act({
       steps: [{ ref: '向门店助手提问', action: 'setValue', args: ['调 1 人支援收银可以吗？'] }],
@@ -64,5 +66,34 @@ describe('门店助手对话框（ui-sdk agent-ready）', () => {
     await waitFor(() => {
       expect(screen.getByText(/预测平均等待|无法执行|岗位资格|模拟/)).toBeTruthy();
     });
+  });
+
+  it('does not submit while Chinese IME composition confirms Enter',async()=>{
+    const user=userEvent.setup();
+    render(<AgentPanel tools={tools} signals={signals} layout={layout} at={TEST_AT}/>);
+    await screen.findByText('浏览器本地规则（离线）');
+    const input=screen.getByLabelText<HTMLTextAreaElement>('向门店助手提问');
+    await user.type(input,'收银区为什么排队？');
+    fireEvent.keyDown(input,{key:'Enter',isComposing:true});
+    expect(screen.queryByLabelText('我的提问')).toBeNull();
+    expect(input.value).toBe('收银区为什么排队？');
+    await user.keyboard('{Enter}');
+    await waitFor(()=>expect(screen.getByLabelText('我的提问').textContent).toBe('收银区为什么排队？'));
+  });
+
+  it('human-readable presets submit supported questions and preserve evidence access', async()=>{
+    const user=userEvent.setup();
+    render(<AgentPanel tools={tools} signals={signals} layout={layout} at={TEST_AT}/>);
+    await screen.findByText('浏览器本地规则（离线）');
+    await user.click(screen.getByRole('button',{name:/收银排队/}));
+    await waitFor(()=>expect(screen.getByLabelText('我的提问').textContent).toBe('收银区为什么排队？'));
+    const evidence=await screen.findByRole('button',{name:'展开证据与工具轨迹'});
+    await user.click(evidence);
+    expect(screen.getByText(/工具调用：/)).toBeTruthy();
+    expect(screen.getAllByText('来源').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('时间').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('置信').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('合成信号').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('向门店助手提问')).toBeTruthy();
   });
 });

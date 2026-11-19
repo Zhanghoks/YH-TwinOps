@@ -29,7 +29,7 @@ describe('read-only layout geometry audit', () => {
     expect(report.doorIds).toEqual([]);
     expect(report.overlapPairs).toEqual([]);
     expect(report.outsideStoreIds).toEqual([]);
-    expect(report.narrowGaps).toHaveLength(45);
+    expect(report.narrowGaps).toHaveLength(40);
     expect(report.outsideZoneFixtureIds.length).toBe(56);
     expect(report.narrowGaps).toContainEqual({ fixtureIds: ['F024', 'F044'], axis: 'x', gapM: .1 });
     expect(report.warningCodes).toContain('ALL_FIXTURES_FIXED');
@@ -59,5 +59,29 @@ describe('read-only layout geometry audit', () => {
   it('makes review thresholds explicit and rejects invalid values', () => {
     expect(auditStoreLayout(store([fixture('a',0,0),fixture('b',2.5,0)]), { gapReviewThresholdM: .4 }).narrowGaps).toEqual([]);
     for(const value of [0,-1,NaN,Infinity]) expect(()=>auditStoreLayout(store([]),{gapReviewThresholdM:value})).toThrow(RangeError);
+  });
+});
+
+it('leaves a continuous 1m seam between packaged food and adjacent household rows', () => {
+  // A pairwise intersection test alone missed staggered shelves interleaving in X.
+  for (const current of [layout, generatePlanningLayout(layout).layout]) {
+    const foods = current.fixtures.filter(f => f.zoneId === 'zone-packaged');
+    const home = current.fixtures.filter(f => f.zoneId === 'zone-household' && f.z < 20);
+    const foodEdge = Math.max(...foods.map(f => f.x + f.widthM / 2));
+    const homeEdge = Math.min(...home.map(f => f.x - f.widthM / 2));
+    expect(homeEdge - foodEdge).toBeGreaterThanOrEqual(1 - 1e-8);
+    expect(auditStoreLayout(current).overlapPairs).toEqual([]);
+  }
+});
+
+it('preserves shelf row anchors and IDs when trimming only the packaged boundary ends', () => {
+  const ids = ['F079','F082','F085','F088','F091','F094','F097','F100','F103','F106'];
+  expect(layout.fixtures).toHaveLength(150);
+  ids.forEach((id, i) => {
+    const f = layout.fixtures.find(f => f.fixtureId === id)!;
+    expect(f.x + f.widthM / 2).toBeCloseTo(27.3);
+    expect(f.x - f.widthM / 2).toBeCloseTo(i < 8 ? 23.75 : 24.35);
+    expect(f.rotationY).toBe(0);
+    expect(f.widthM).toBeGreaterThan(2.9);
   });
 });

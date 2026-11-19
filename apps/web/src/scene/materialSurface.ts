@@ -33,9 +33,9 @@ export function buildSurfacePixels(kind: SurfaceKind, size = 64): SurfacePixels 
       height = 128 + grain * 24 + fine * 6;
     } else if (kind === 'brushedMetal') {
       const brush = noise(x, 0);
-      color = 239 + brush * 12 + n * 3;
-      roughness = 94 + brush * 62 + n * 8;
-      height = 128 + (brush - .5) * 12;
+      color = 246 + brush * 4 + n * 2;
+      roughness = 132 + brush * 12 + n * 4;
+      height = 128 + (brush - .5) * 3;
     } else if (kind === 'packaging') {
       const label = u > .15 && u < .85 && v > .27 && v < .7;
       const stripe = v < .10 || v > .91;

@@ -946,3 +946,38 @@ code {
 .workbench .main.model-focused .workbench-split-handle { display: none !important; }
 
 .reference-checkout-number { background: #195c48; color: #fff; border-radius: 2px; padding: 1px 2px; font: 600 10px/1.15 sans-serif; white-space: nowrap; pointer-events: none; }
+.weather-controls {position:absolute;right:16px;top:64px;z-index:21;display:flex;align-items:center;gap:7px;padding:8px 10px;background:#fffdf5ed;border:1px solid #d3d9cd;border-radius:8px;font-size:12px;color:#34483e;flex-wrap:wrap;max-width:340px;}
+.weather-controls button {border:1px solid #aab9ad;border-radius:5px;background:#fff;color:#34483e;padding:4px 9px;cursor:pointer;}
+.weather-controls button[aria-pressed=true] {background:#195d49;color:white;}
+.weather-controls small {flex-basis:100%;}
+
+/* Smaller screens retain a readable assistant rather than a squeezed split pane. */
+@media (max-width: 900px) {
+ .workbench .main:not(.model-focused),.workbench [data-slot='resizable'].main:not(.model-focused){flex-direction:column!important;}
+ .workbench .main:not(.model-focused) .scene-pane {flex:0 0 34vh!important;min-height:230px;height:34vh!important;width:100%!important;}
+ .workbench .main:not(.model-focused) .agent-pane {flex:1 1 auto!important;width:100%!important;height:auto!important;min-height:340px;}
+ .workbench .workbench-split-handle {display:none;}
+ .workbench .topbar {flex-wrap:wrap;gap:6px;height:auto;min-height:56px;padding:8px 12px;}
+ .workbench .topbar .subtitle {font-size:10px;}
+ .workbench .scene-toolbar {max-width:calc(100% - 24px);flex-wrap:wrap;}
+ .workbench .statusbar {font-size:10px;padding:4px 8px;}
+ .workbench .weather-controls {display:none;}
+ .workbench .main.model-focused .weather-controls {display:flex;}
+}
+
+.customer-controls {position:absolute;right:16px;top:212px;z-index:21;display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:340px;padding:7px 9px;border:1px solid #ccd7c9;border-radius:7px;background:#fffdf5ed;font-size:11px;color:#34483e;}
+.customer-controls button {background:white;border:1px solid #aab9ad;border-radius:5px;padding:4px 7px;color:#34483e;}
+.customer-controls button:disabled {opacity:.5;}
+@media(max-width:900px) {.main:not(.model-focused) .customer-controls {top:58px;right:8px;max-width:280px;}}
+
+/* Dedicated analytics stays mounted alongside the 3D workspace to preserve view state. */
+.workspace-view-toggle { display:flex; gap:3px; padding:3px; border:1px solid #cbd8d1; border-radius:8px; background:#edf2ef; }
+.workspace-view-toggle button { border:0; background:transparent; color:#456155; font-size:12px; padding:7px 10px; border-radius:5px; white-space:nowrap; }
+.workspace-view-toggle button[aria-checked="true"] { background:#245c4d; color:white; }
+.workspace-view-toggle button:focus-visible { outline:2px solid #207463; outline-offset:2px; }
+.workbench .main.workspace-hidden { display:none!important; }
+.analytics-view { flex:1; min-height:0; overflow:auto; background:#eff3f0; }
+.analytics-view[hidden] { display:none; }
+.analytics-incident { margin:24px; padding:28px; background:white; border:1px solid #cfddd5; border-radius:12px; color:#23483b; }
+.analytics-incident button { padding:10px 16px; border:1px solid #427261; border-radius:6px; background:#245c4d; color:white; }
+@media(max-width:690px) { .topbar-end { flex-wrap:wrap; } .workspace-view-toggle button { padding:6px 8px; } }

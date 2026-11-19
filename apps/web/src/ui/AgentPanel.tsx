@@ -1,9 +1,11 @@
+import './AgentPanel.css';
 /**
  * 侧边栏统一门店助手对话框：对话流 + 预设提问 + 证据折叠。
  * 优先走 /api/agent（服务端 pi / 本地规则）；API 不可达时降级浏览器内规则解释器。
  */
 import { useEffect, useId, useState } from 'react';
 import { Button } from '@ui-sdk/react/button';
+import { ArrowUp, ArrowUpRight, Bot, ChartNoAxesCombined, Database, ListChecks, ShieldCheck, Users, Waypoints } from 'lucide-react';
 import {
   Collapsible,
   CollapsiblePanel,
@@ -30,10 +32,10 @@ import {
 } from '../api';
 
 const PRESETS = [
-  '现在门店哪里最需要我处理？证据是什么？',
-  'zone-checkout 为什么这么堵？',
-  'zone-produce 这个区域为什么没数据？',
-  '调 3 人支援收银行不行？',
+  { icon: ListChecks, title:'优先处理', detail:'先看告警与证据', question:'现在门店哪里最需要我处理？证据是什么？' },
+  { icon: ChartNoAxesCombined, title:'收银排队', detail:'解释拥堵与约束', question:'收银区为什么排队？' },
+  { icon: Database, title:'数据盲区', detail:'核查缺失与过期信号', question:'哪些区域没数据或信号过期？' },
+  { icon: Users, title:'人员支援', detail:'先模拟，再判断可行性', question:'调 3 人支援收银行不行？' },
 ];
 
 interface ChatTurn {
@@ -42,6 +44,7 @@ interface ChatTurn {
   text: string;
   pending?: boolean;
   answer?: StoreAgentAnswer;
+  asOf?: string;
 }
 
 function EvidenceList({ evidence }: { evidence: AgentEvidence[] }) {
@@ -50,8 +53,9 @@ function EvidenceList({ evidence }: { evidence: AgentEvidence[] }) {
     <ul className="evidence-list">
       {evidence.map((e, i) => (
         <li key={`${e.signalId}-${i}`} className="evidence-chip">
-          <code>{e.signalId}</code> {e.metric} @ {e.observedAt} · 来源 {e.sourceId} · {e.kind}
-          {e.synthetic ? ' · 合成' : ''} · 置信 {e.confidence ?? '—'}
+          <div className="evidence-card-title"><code>{e.signalId}</code><span>{e.synthetic ? '合成信号' : e.kind}</span></div>
+          <strong>{e.metric}</strong>
+          <dl><div><dt>来源</dt><dd>{e.sourceId}</dd></div><div><dt>时间</dt><dd>{e.observedAt}</dd></div><div><dt>置信</dt><dd>{e.confidence ?? '—'}</dd></div></dl>
         </li>
       ))}
     </ul>
@@ -62,6 +66,7 @@ function AssistantBubble({ turn }: { turn: ChatTurn }) {
   const answer = turn.answer;
   return (
     <article className="chat-bubble chat-bubble-assistant" aria-label="助手回答">
+      <div className="agent-answer-label"><span className="agent-answer-identity"><Bot size={14} aria-hidden="true" />门店助手</span><span>{turn.asOf ? `取数 ${new Date(turn.asOf).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })} 北京时间` : '依据提问时场景'}</span></div>
       <div className="answer-text">{turn.text}</div>
       {answer !== undefined && answer.cannotJudge.length > 0 && (
         <div className="cannot-judge">
@@ -76,7 +81,7 @@ function AssistantBubble({ turn }: { turn: ChatTurn }) {
       {answer !== undefined && (
         <Collapsible className="agent-collapsible" defaultOpen={false}>
           <CollapsibleTrigger aria-label="展开证据与工具轨迹">
-            证据与工具轨迹
+            <Waypoints size={14} aria-hidden="true" />证据 {answer.evidence.length} 条 · 工具轨迹
             {answer.mode === 'pi-llm' ? ` · ${answer.model}` : ' · 本地规则'}
           </CollapsibleTrigger>
           <CollapsiblePanel>
@@ -161,7 +166,7 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
     setTurns((prev) =>
       prev.map((t) =>
         t.id === assistantId
-          ? { id: assistantId, role: 'assistant', text: answer.answer, answer, pending: false }
+          ? { id: assistantId, role: 'assistant', text: answer.answer, answer, pending: false, asOf: at }
           : t,
       ),
     );
@@ -177,14 +182,11 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
         : '浏览器本地规则（离线）';
 
   return (
-    <section className="agent-dialog" aria-label="门店助手对话框">
+    <section className="agent-dialog agent-workspace" aria-label="门店助手对话框">
       <header className="agent-dialog-head agent-dialog-head-embedded">
-        <p className="panel-note">
-          {status?.note ?? '回答带证据引用；数据不足如实说明；模型意见只能进沙盒。'}
-        </p>
-        <span className="agent-engine-chip" title={status?.note}>
-          {engineLabel}
-        </span>
+        <div className="agent-context-row"><span className="agent-data-badge">合成教学数据</span><span className="agent-engine-chip" title={status?.note}>{engineLabel}</span></div>
+        <p className="agent-scope-note"><ShieldCheck size={13} aria-hidden="true" />建议与推演，不直接执行门店操作</p>
+        <p className="agent-snapshot-time">场景时间 · {at.replace('T',' ').replace('Z',' UTC')}</p>
       </header>
 
       <ScrollArea className="agent-transcript" stickToEnd>
@@ -192,18 +194,18 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
           <ScrollAreaContent>
             {turns.length === 0 ? (
               <div className="chat-empty">
-                <p>向助手提问高峰运营问题。数值来自确定性工具，不会编造。</p>
+                <div className="agent-empty-heading"><div className="agent-avatar"><Bot size={22} strokeWidth={1.6} aria-hidden="true" /></div><span className="agent-empty-eyebrow">门店运营 · COPILOT</span><h3>有什么需要一起看看？</h3><p>从现场信号中找线索，<br />让每个建议都有据可循。</p></div>
                 <div className="preset-row" role="group" aria-label="预设提问">
                   {PRESETS.map((p) => (
                     <Button
-                      key={p}
+                      key={p.title}
                       className="preset"
                       disabled={busy}
                       onClick={() => {
-                        void ask(p);
+                        void ask(p.question);
                       }}
                     >
-                      {p}
+                      <p.icon className="agent-preset-icon" size={18} strokeWidth={1.7} aria-hidden="true" /><span className="agent-preset-title">{p.title}<ArrowUpRight size={14} aria-hidden="true" /></span><span className="agent-preset-detail">{p.detail}</span>
                     </Button>
                   ))}
                 </div>
@@ -216,7 +218,7 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
                       {turn.text}
                     </div>
                   ) : turn.pending ? (
-                    <div key={turn.id} className="chat-bubble chat-bubble-assistant chat-pending" aria-busy="true">
+                    <div key={turn.id} className="chat-bubble chat-bubble-assistant chat-pending" aria-busy="true" role="status">
                       {turn.text}
                     </div>
                   ) : (
@@ -237,14 +239,14 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
         <div className="preset-row preset-row-compact" role="group" aria-label="继续提问预设">
           {PRESETS.map((p) => (
             <Button
-              key={p}
+              key={p.title}
               className="preset"
               disabled={busy}
               onClick={() => {
-                void ask(p);
+                void ask(p.question);
               }}
             >
-              {p}
+              {p.title}
             </Button>
           ))}
         </div>
@@ -265,20 +267,20 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
             value={question}
             autoResize
             rows={2}
-            placeholder="例如：zone-checkout 为什么这么堵？"
+            placeholder="例如：现在先处理什么？为什么？"
             disabled={busy}
             onValueChange={(value) => setQuestion(value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 void ask(question);
               }
             }}
           />
-          <FieldDescription>区域 ID 形如 zone-checkout。Enter 发送，Shift+Enter 换行。</FieldDescription>
+          <FieldDescription>Enter 发送 · Shift+Enter 换行</FieldDescription>
         </Field>
-        <Button type="submit" className="primary" disabled={busy || question.trim().length === 0} pendingAnnouncement="正在提问">
-          提问
+        <Button type="submit" className="primary" disabled={busy || question.trim().length === 0} pendingAnnouncement="正在提问" aria-label="提问">
+          <ArrowUp size={17} aria-hidden="true" />提问
         </Button>
       </form>
     </section>

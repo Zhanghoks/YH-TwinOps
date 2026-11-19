@@ -50,3 +50,9 @@ it('gives produce beds a repeated rounded merchandise relief rather than package
   expect(bed.color).not.toEqual(buildSurfacePixels('packaging').color);
   expect(Math.max(...bed.heightMap.filter((_,i)=>i%4===0))-Math.min(...bed.heightMap.filter((_,i)=>i%4===0))).toBeGreaterThan(100);
 });
+
+it('keeps brushed-metal relief subtle instead of coarse woodlike striping', () => {
+  const m=buildSurfacePixels('brushedMetal');
+  const heights=Array.from(m.heightMap).filter((_,i)=>i%4===0);
+  expect(Math.max(...heights)-Math.min(...heights)).toBeLessThanOrEqual(4);
+});

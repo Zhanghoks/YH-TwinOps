@@ -22,7 +22,7 @@ describe('procedural fixture detail', () => {
         const [widthM = 3, depthM = 1, heightM = 2] = dimensions;
         const parts = buildFixtureDetail(fixture({ fixtureType, widthM, depthM, heightM }));
         expect(parts.length).toBeGreaterThan(3);
-        expect(parts.length).toBeLessThan(300);
+        expect(parts.length).toBeLessThan(fixtureType === 'GONDOLA' ? 2300 : 300);
         expect(new Set(parts.map((p) => p.id)).size).toBe(parts.length);
         for (const part of parts) {
           expect(part.color).toMatch(/^#[0-9a-f]{6}$/i);
@@ -49,7 +49,7 @@ describe('procedural fixture detail', () => {
 
   it('keeps the full-store detail budget bounded and does not alter the real demo layout', () => {
     const before = JSON.stringify(layout);
-    const parts = layout.fixtures.flatMap(buildFixtureDetail);
+    const parts = layout.fixtures.flatMap(f=>buildFixtureDetail(f,{lod:'far'}));
     expect(parts.length).toBeGreaterThan(1000);
     expect(parts.length).toBeLessThan(25000);
     expect(new Set(parts.map((p) => `${p.primitive}-${p.material}`)).size).toBeLessThanOrEqual(12);
@@ -91,8 +91,8 @@ describe('procedural fixture detail', () => {
     expect(plinth('zone-household')?.color).not.toBe(plinth('zone-packaged')?.color);
     expect(plinth('zone-household', 'F001')?.color).toBe(plinth('zone-household', 'F099')?.color);
     expect(themed('zone-packaged').filter((p) => p.id.startsWith('end-panel-'))).toHaveLength(2);
-    const bottleHeight = (zoneId: string) => Math.max(...themed(zoneId).filter((p) => p.id.startsWith('pack-bottle-')).map((p) => p.size[1]));
-    expect(bottleHeight('zone-household')).toBeGreaterThan(bottleHeight('zone-beverages'));
+    expect(themed('zone-household').some(p => p.id.startsWith('bottle-neck-handle-top'))).toBe(true);
+    expect(themed('zone-beverages').some(p => p.id.startsWith('bottle-neck-handle-top'))).toBe(false);
   });
 
   it('makes the existing beverage-zone FREEZER stock recognizable as bottles', () => {
@@ -103,7 +103,7 @@ describe('procedural fixture detail', () => {
   it('keeps themed wide gondolas bounded and within the per-fixture detail budget', () => {
     for (const zoneId of ['zone-beverages', 'zone-household', 'zone-packaged', 'zone-bulk']) {
       const f = fixture({ zoneId, widthM: 12, depthM: 4, heightM: 3.5 });
-      const parts = buildFixtureDetail(f);
+      const parts = buildFixtureDetail(f, {lod:'far'});
       expect(parts.length).toBeLessThan(300);
       for (const part of parts) {
         expect(Math.abs(part.position[0]) + part.size[0] / 2).toBeLessThanOrEqual(f.widthM / 2 + 1e-9);
@@ -165,7 +165,7 @@ describe('candidate beverage presentation', () => {
     expect(parts.some((p) => p.id.startsWith('pack-bottle-'))).toBe(true);
     expect(parts.filter((p) => p.id.startsWith('pack-bottle-')).some((p) => p.position[0] < 0)).toBe(true);
     expect(parts.filter((p) => p.id.startsWith('pack-bottle-')).some((p) => p.position[0] > 0)).toBe(true);
-    expect(parts.length).toBeLessThan(300);
+    expect(buildFixtureDetail(f,{lod:'far'}).length).toBeLessThan(300);
     for (const p of parts) {
       expect(Math.abs(p.position[0])+p.size[0]/2).toBeLessThanOrEqual(f.widthM/2+1e-9);
       expect(Math.abs(p.position[2])+p.size[2]/2).toBeLessThanOrEqual(f.depthM/2+1e-9);
@@ -214,8 +214,37 @@ describe('produce and packaged shelf sample refinement', () => {
   });
   it('adds restrained top-shelf package stripes to food shelves, not all fixtures', () => {
     const p = buildFixtureDetail(fixture({zoneId:'zone-packaged'}));
-    expect(p.filter(x=>x.id.startsWith('package-stripe-'))).toHaveLength(10);
-    expect(p.length).toBeLessThan(300);
+    expect(p.filter(x=>x.id.startsWith('package-stripe-')).length).toBeGreaterThan(0);
+    expect(p.filter(x=>x.id.startsWith('package-stripe-')).every(x=>x.id.startsWith('package-stripe-3-'))).toBe(true);
+    expect(buildFixtureDetail(fixture({zoneId:'zone-packaged'}), {lod:'far'}).length).toBeLessThan(300);
     expect(buildFixtureDetail(fixture({zoneId:'zone-household'})).some(x=>x.id.startsWith('package-stripe-'))).toBe(false);
   });
 });
+
+describe('component-board silhouette distinctions', () => {
+  it('uses framed fruit-island joinery without changing fixture identity', () => {
+    const input = fixture({ fixtureType: 'PRODUCE_ISLAND' });
+    const before = structuredClone(input);
+    const parts = buildFixtureDetail(input);
+    expect(parts.filter(p => p.id.startsWith('base-stile-'))).toHaveLength(8);
+    expect(parts.filter(p => p.id.startsWith('base-border-'))).toHaveLength(4);
+    expect(input).toEqual(before);
+  });
+  it('distinguishes open dairy display from glass-door frozen cabinets', () => {
+    const dairy = buildFixtureDetail(fixture({ fixtureType: 'FREEZER', zoneId: 'zone-dairy' }));
+    const frozen = buildFixtureDetail(fixture({ fixtureType: 'FREEZER', zoneId: 'zone-frozen' }));
+    expect(dairy.some(p => p.id.startsWith('glass-door'))).toBe(false);
+    expect(dairy.filter(p => p.id.startsWith('chilled-price-'))).toHaveLength(3);
+    expect(frozen.some(p => p.id.startsWith('glass-door'))).toBe(true);
+    expect(frozen.filter(p => p.id.startsWith('vent-slot-'))).toHaveLength(10);
+  });
+  it('gives seafood and meat stainless bases, bakery and deli warm timber fronts', () => {
+    for (const zoneId of ['zone-seafood', 'zone-meat', 'zone-bakery', 'zone-deli']) {
+      const parts = buildFixtureDetail(fixture({ fixtureType: 'DELI_COUNTER', zoneId }));
+      expect(parts.find(p => p.id === 'case-base')?.material).toBe(['zone-seafood', 'zone-meat'].includes(zoneId) ? 'metal' : 'wood');
+      expect(parts.filter(p => p.id.startsWith('counter-front-panel'))).toHaveLength(4);
+    }
+  });
+});
+
+it('keeps distinct checkout payment, receipt and bagging details inside both axis orientations',()=>{for(const [widthM,depthM] of [[3.6,1.2],[1.3,2.6]]){const p=buildFixtureDetail(fixture({fixtureType:'CHECKOUT',widthM,depthM}));for(const id of ['receipt-printer','receipt-paper','reader-display','bag-base','pos-ui-header'])expect(p.some(a=>a.id===id)).toBe(true);for(const a of p){expect(Math.abs(a.position[0])+a.size[0]/2).toBeLessThanOrEqual(widthM!/2+1e-9);expect(Math.abs(a.position[2])+a.size[2]/2).toBeLessThanOrEqual(depthM!/2+1e-9);}}});

@@ -1,3 +1,6 @@
+import { buildFarShelfMerchandise, buildMerchandise, buildShelfPlanogram, buildShelfStructure, merchandisingTheme, supportsShelfPlanogram } from './shelfDisplay';
+export { buildMerchandise, buildShelfPlanogram, buildShelfStructure, supportsShelfPlanogram } from './shelfDisplay';
+import { buildSpecialComponent, type SpecialComponent } from './specialComponents';
 import type { Fixture } from '@yh/contracts';
 
 export type DetailPrimitive = 'box' | 'sphere';
@@ -20,36 +23,22 @@ const PACKS = ['#b75e48', '#d9ae58', '#729b8c', '#e1d3ac', '#698ba1', '#bc927c']
 // Muted vegetable / apple / citrus shades, avoiding toy-like primary colours.
 const FRUIT = ['#82934c', '#c9943e', '#ac5943', '#587d49', '#bfad67', '#843f37'];
 
-type MerchandisingStyle = 'mixed' | 'beverages' | 'household' | 'packaged' | 'bulk';
-interface MerchandisingTheme { style: MerchandisingStyle; accent: string; panel: string; palette: string[] }
-/** Zone colours are semantic, stable across fixture IDs; no real brand or SKU mapping. */
-function merchandisingTheme(zoneId: string): MerchandisingTheme {
-  switch (zoneId) {
-    case 'zone-beverages': return { style: 'beverages', accent: '#496c77', panel: '#cad9d9', palette: ['#799c94', '#5d8191', '#bca36b', '#d0c6a8'] };
-    case 'zone-household': return { style: 'household', accent: '#68738d', panel: '#d9dde5', palette: ['#94afbd', '#bbc8c0', '#8f9ab1', '#dddacb'] };
-    case 'zone-packaged': return { style: 'packaged', accent: '#a16b4e', panel: '#ddc9b4', palette: ['#b76d4f', '#d1ad63', '#d8c7a3', '#8d9a71'] };
-    case 'zone-bulk': return { style: 'bulk', accent: '#92734d', panel: '#b39a73', palette: ['#c4b18a', '#d7c6a4', '#a39470', '#d4b57c'] };
-    default: return { style: 'mixed', accent: COLORS.trim, panel: '#d5dcd6', palette: PACKS };
-  }
-}
-
 /**
  * Original generic merchandising, not measured stock, inventory, brand packaging or real SKU data.
  * Normalized construction keeps ALL detail inside StoreLayout's existing collision envelope.
  * Bounded bay counts cap instance count even for exceptionally large fixture dimensions.
  */
-export type DetailFixtureShape = Pick<Fixture, 'fixtureId' | 'fixtureType' | 'zoneId' | 'widthM' | 'depthM' | 'heightM' | 'x' | 'y' | 'z' | 'rotationY'>;
-export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
+export type DetailFixtureShape = Pick<Fixture, 'fixtureId' | 'fixtureType' | 'zoneId' | 'widthM' | 'depthM' | 'heightM' | 'x' | 'y' | 'z' | 'rotationY'> & { designVariant?: 'vegetable' | SpecialComponent };
+export function buildFixtureDetail(f: DetailFixtureShape, { stocked = true, lod = 'near' }: { stocked?: boolean; lod?: 'near' | 'far' } = {}): DetailPart[] {
   if (![f.widthM, f.depthM, f.heightM].every((n) => Number.isFinite(n) && n > 0)) {
     throw new RangeError('Fixture dimensions must be finite and positive');
   }
-  if (f.fixtureType === 'FREEZER' && f.zoneId === 'zone-beverages' && f.depthM > f.widthM * 2) {
-    // Narrow image-candidate presentation only: open bottle merchandising, not an
-    // equipment-type assertion. The source remains FREEZER; no business fields are changed.
-    // Build along the long axis, then swap local axes back inside the original envelope.
-    return buildFixtureDetail({ ...f, fixtureType: 'GONDOLA', widthM: f.depthM, depthM: f.widthM }).map((p) => ({
-      ...p, position: [p.position[2], p.position[1], p.position[0]], size: [p.size[2], p.size[1], p.size[0]],
-    }));
+  if (f.designVariant && f.designVariant !== 'vegetable') return buildSpecialComponent(f, f.designVariant);
+  if (supportsShelfPlanogram(f)) {
+    const structure = buildShelfStructure(f);
+    if (!stocked) return structure;
+    const slots = buildShelfPlanogram(f);
+    return [...structure, ...(lod === 'far' ? buildFarShelfMerchandise(slots) : slots.flatMap(buildMerchandise))];
   }
   const parts: DetailPart[] = [];
   const hash = [...f.fixtureId].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
@@ -59,67 +48,41 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
     parts.push({ id, primitive, position: [position[0] * f.widthM, position[1] * f.heightM, position[2] * f.depthM], size: [size[0] * f.widthM, size[1] * f.heightM, size[2] * f.depthM], color, material });
   };
   const theme = merchandisingTheme(f.zoneId);
-  const bottleHeavy = theme.style === 'beverages' || theme.style === 'household';
-  const bays = Math.min(bottleHeavy ? 6 : 8, Math.max(3, Math.round(f.widthM / 0.45)));
   const xAt = (i: number, count: number, span = 0.88): number => ((i + 0.5) / count - 0.5) * span;
 
-  switch (f.fixtureType) {
-    case 'GONDOLA': {
-      add('plinth', [0, .045, 0], [.98, .09, .96], theme.accent, theme.style === 'bulk' ? 'wood' : 'metal');
-      add('central-spine', [0, .52, 0], [.95, .92, .035], COLORS.white);
-      for (const x of [-.47, .47]) add(`upright-${x}`, [x, .52, 0], [.025, .96, .055], COLORS.metal);
-      // End panels / coloured bands identify department without covering top-down stock.
-      for (const edge of [-1, 1]) {
-        add(`end-panel-${edge}`, [edge * .485, .47, 0], [.02, .76, .66], theme.panel, theme.style === 'bulk' ? 'wood' : 'metal');
-        add(`department-band-${edge}`, [edge * .497, .78, 0], [.006, .08, .66], theme.accent, 'label');
-        for (let mark = 0; mark < 3; mark++) add(`department-mark-${edge}-${mark}`, [edge * .497, .57 - mark * .065, 0], [.006, .025, .28 - mark * .045], COLORS.white, 'label');
-      }
-      for (let level = 0; level < 4; level++) {
-        const y = .13 + level * .205;
-        add(`shelf-${level}`, [0, y, 0], [.96, .026, .93], COLORS.white);
-        for (const side of [-1, 1]) {
-          add(`price-rail-${level}-${side}`, [0, y + .015, side * .468], [.95, .035, .018], theme.accent);
-          for (let col = 0; col < bays; col++) {
-            const x = xAt(col, bays);
-            const slot = col + level;
-            const kind = theme.style === 'beverages' ? (slot % 5 === 4 ? 2 : 1)
-              : theme.style === 'household' ? (slot % 4 === 3 ? 0 : 1)
-              : theme.style === 'packaged' ? (slot % 4 === 3 ? 2 : 0)
-              : theme.style === 'bulk' ? 3 : slot % 3;
-            const height = theme.style === 'household' ? .15 + (slot % 3) * .01
-              : theme.style === 'beverages' ? .13 + (slot % 3) * .01
-              : .115 + (slot % 5) * .012;
-            const bottom = y + .013;
-            const id = `${level}-${side}-${col}`;
-            const color = theme.palette[slot % theme.palette.length] ?? COLORS.white;
-            if (kind === 1) {
-              // Rounded bottle body with a narrow neck and closure, no new mesh primitive.
-              add(`pack-bottle-${id}`, [x, bottom + height * .375, side * .24], [.54 / bays, height * .75, .22], color, 'product', 'sphere');
-              add(`bottle-neck-${id}`, [x, bottom + height * .80, side * .24], [.20 / bays, height * .20, .08], color, 'product');
-              add(`bottle-cap-${id}`, [x, bottom + height * .96, side * .24], [.24 / bays, height * .08, .10], COLORS.white, 'label');
-            } else if (kind === 2) {
-              add(`pack-jar-${id}`, [x, bottom + height * .44, side * .24], [.65 / bays, height * .88, .25], color, 'product', 'sphere');
-              add(`jar-lid-${id}`, [x, bottom + height * .93, side * .24], [.52 / bays, height * .10, .20], COLORS.metal);
-            } else if (kind === 3) {
-              add(`pack-sack-${id}`, [x, bottom + height * .46, side * .24], [.70 / bays, height * .92, .30], color, 'product', 'sphere');
-              add(`sack-seam-${id}`, [x, bottom + height * .94, side * .24], [.30 / bays, height * .04, .11], theme.accent, 'wood');
-            } else {
-              add(`pack-box-${id}`, [x, bottom + height / 2, side * .24], [.70 / bays, height, .31], color, 'product');
-              if (theme.style === 'packaged' && level === 3) add(`package-stripe-${id}`, [x, bottom + height + .001, side * .24], [.20 / bays, .002, .27], COLORS.label, 'label');
-            }
-            const face = kind === 1 ? .343 : kind === 2 ? .357 : kind === 3 ? .378 : .398;
-            add(`pack-label-${id}`, [x, bottom + height * .43, side * face], [.36 / bays, height * .30, .008], COLORS.label, 'label');
-            add(`price-${level}-${side}-${col}`, [x, y + .018, side * .479], [.38 / bays, .021, .006], COLORS.white, 'label');
-          }
+  if (f.designVariant === 'vegetable') {
+    add('vegetable-plinth', [0,.13,0], [.98,.26,.98], COLORS.wood,'wood');
+    for (const x of [-.475,.475]) add(`vegetable-upright-${x}`, [x,.61,-.43], [.025,.76,.035], COLORS.dark);
+    for (let level=0;level<3;level++) {
+      const y=.3+level*.26, z=.32-level*.3;
+      add(`vegetable-tray-${level}`, [0,y,z], [.96,.045,.31], COLORS.wood,'wood');
+      for(const x of [-.46,.46]) add(`vegetable-bracket-${level}-${x}`, [x,y-.025,(z-.43)/2], [.022,.035,z+.43+.03], COLORS.dark);
+      add(`vegetable-back-${level}`, [0,y+.075,-.44],[.92,.14,.02],'#567344');
+      add(`vegetable-retainer-${level}`, [0,y+.04,z+.151], [.96,.065,.018], COLORS.dark);
+      add(`vegetable-price-${level}`, [0,y+.055,z+.163], [.76,.025,.005], COLORS.label,'label');
+      for(let col=0;col<4;col++) {
+        const x=xAt(col,4,.91);
+        add(`vegetable-bed-${level}-${col}`, [x,y+.045,z], [.215,.045,.26], colorAt(FRUIT,col+level),'produceBed');
+        for(let n=0;n<6;n++) {
+          const px=x+(n%3-1)*.06, pz=z+(Math.floor(n/3)-.5)*.12;
+          add(`vegetable-piece-${level}-${col}-${n}`, [px,y+.09,pz], [.05,.065,.09], colorAt(FRUIT,col+level),'product','sphere');
+          if ((col+level)%3===0) for(let leaf=0;leaf<2;leaf++) add(`vegetable-leaf-${level}-${col}-${n}-${leaf}`, [px+(leaf-.5)*.025,y+.12,pz], [.045,.018,.095], leaf ? '#729a51' : '#53763e','product','sphere');
         }
       }
-      // Only the narrow spine is capped: an overhead lid would hide the merchandise.
-      add('top-cap', [0, .985, 0], [.98, .03, .065], COLORS.metal);
-      break;
     }
+    add('vegetable-header',[0,.96,-.43],[.96,.08,.04],COLORS.trim);
+    return parts;
+  }
+
+  switch (f.fixtureType) {
     case 'PRODUCE_ISLAND': {
       add('base', [0, .31, 0], [.92, .62, .9], COLORS.wood, 'wood');
       add('toe-kick', [0, .04, 0], [.85, .08, .84], COLORS.dark);
+      // Board 01: warm framed joinery, inset panels and a recessed metal plinth.
+      for (const side of [-1, 1]) {
+        for (const y of [.12, .58]) add(`base-border-${side}-${y}`, [0, y, side*.456], [.94, .035, .014], COLORS.dark);
+        for (let i = 0; i < 4; i++) add(`base-stile-${side}-${i}`, [(i/3-.5)*.9, .35, side*.456], [.012, .47, .014], COLORS.dark);
+      }
       add('display-bed', [0, .66, 0], [.98, .08, .98], COLORS.wood, 'wood');
       for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) {
         const x = xAt(col, 3, .9), z = row === 0 ? -.235 : .235;
@@ -170,7 +133,15 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
           }
         }
       }
-      for (let door = 0; door < doors; door++) {
+      // Board 07 is an open dairy multideck; board 08 retains framed glass doors.
+      for (let i = 0; i < 10; i++) add(`vent-slot-${i}`, [xAt(i, 10), .075, .497], [.055, .055, .006], '#78817e');
+      if (f.zoneId === 'zone-dairy') {
+        for (let level = 0; level < 3; level++) {
+          add(`chilled-price-${level}`, [0, .245 + level*.22, .405], [.94, .035, .012], COLORS.label, 'label');
+        }
+        for (const x of [-.455, .455]) add(`dairy-light-${x}`, [x, .54, .385], [.014, .72, .018], '#fff5d8', 'label');
+      }
+      for (let door = 0; door < (f.zoneId === 'zone-dairy' ? 0 : doors); door++) {
         const x = xAt(door, doors, .95);
         add(`glass-door-${door}`, [x, .525, .455], [.91 / doors, .73, .018], COLORS.glass, 'glass');
         add(`door-frame-${door}`, [x - .455 / doors, .525, .47], [.012, .75, .026], COLORS.metal);
@@ -197,14 +168,32 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
       checkoutAdd('bagging-tray', [.34, .70, .06], [.22, .02, .7], COLORS.dark);
       checkoutAdd('pos-stem', [.1, .79, -.31], [.03, .18, .04], COLORS.dark);
       checkoutAdd('pos-screen-frame', [.1, .91, -.31], [screenSpan, .18, .06], COLORS.dark);
-      checkoutAdd('pos-screen', [.1, .91, -.274], [longitudinal ? screenSpan * 14 / 17 : .14, .14, .009], '#6eada7', 'glass');
+      checkoutAdd('pos-screen', [.1, .91, -.274], [longitudinal ? screenSpan * 14 / 17 : .14, .14, .009], '#6eada7', 'label');
       checkoutAdd('card-reader', [.24, .76, .32], [.08, .09, .1], COLORS.dark);
       checkoutAdd('belt-item-a', [-.3, .77, -.11], [.1, .13, .22], colorAt(PACKS, 1), 'product');
       checkoutAdd('belt-item-b', [-.14, .75, .13], [.08, .09, .16], colorAt(PACKS, 2), 'product');
+      // Separate checkout work surfaces, generic UI and paper handling; no real sales data.
+      checkoutAdd('scanner-inset', [.16,.716,0], [.075,.006,.28], '#789e9d','label');
+      checkoutAdd('reader-display', [.24,.809,.32], [.055,.008,.065], '#8ac3b6','label');
+      checkoutAdd('receipt-printer', [.30,.765,-.29], [.10,.12,.14], '#d5dad3');
+      checkoutAdd('receipt-slot', [.30,.828,-.245], [.075,.008,.02], COLORS.dark,'rubber');
+      checkoutAdd('receipt-paper', [.30,.85,-.24], [.065,.04,.008], COLORS.label,'label');
+      checkoutAdd('pos-ui-header', [.1,.953,-.267], [screenSpan*.72,.014,.003], '#d4ece4','label');
+      for(let line=0;line<2;line++) checkoutAdd(`pos-ui-line-${line}`, [.1,.91-line*.025,-.267], [screenSpan*(line===0?.60:.42),.009,.003], '#b9d8cd','label');
+      checkoutAdd('bag-base', [.35,.77,.12], [.14,.12,.22], '#b99a68','wood');
+      for(const side of [-1,1]) {
+        checkoutAdd(`bag-handle-post-${side}`, [.35+side*.045,.862,.12], [.012,.065,.016], '#8f744d','wood');
+      }
+      checkoutAdd('bag-handle-top', [.35,.895,.12], [.10,.012,.016], '#8f744d','wood');
+
       break;
     }
     case 'DELI_COUNTER': {
-      add('case-base', [0, .27, 0], [.98, .54, .97], COLORS.wood, 'wood');
+      const stainless = f.zoneId === 'zone-seafood' || f.zoneId === 'zone-meat';
+      add('case-base', [0, .27, 0], [.98, .54, .97], stainless ? '#b9bdb7' : COLORS.wood, stainless ? 'metal' : 'wood');
+      for (let panel = 0; panel < 4; panel++) {
+        add(`counter-front-panel-${panel}`, [xAt(panel, 4, .94), .30, .489], [.22, .36, .012], stainless ? '#d6d8d1' : '#bd9567', stainless ? 'metal' : 'wood');
+      }
       add('toe-kick', [0, .04, 0], [.92, .08, .9], COLORS.dark);
       add('steel-bed', [0, .57, 0], [.99, .06, .96], COLORS.metal);
       for (let col = 0; col < 4; col++) {
@@ -229,6 +218,16 @@ export function buildFixtureDetail(f: DetailFixtureShape): DetailPart[] {
           }
         }
         add(`tray-price-${col}`, [x, .67, .37], [.11, .07, .012], COLORS.label, 'label');
+      }
+      if (f.zoneId === 'zone-bakery') {
+        add('bakery-upper-shelf', [0,.84,-.05], [.92,.022,.55], COLORS.metal);
+        for(const x of [-.45,.45]) add(`bakery-shelf-post-${x}`, [x,.74,-.27], [.018,.32,.018], COLORS.dark);
+        for(let col=0;col<8;col++) {
+          const x=xAt(col,8);
+          add(`bakery-upper-bread-${col}`, [x,.89,-.05], [Math.min(.09,.25/f.widthM),.065,.22], '#d5a65e','product','sphere');
+          add(`bakery-upper-score-${col}`, [x,.924,-.05], [Math.min(.05,.14/f.widthM),.006,.025], '#f0d4a2','product');
+        }
+        add('bakery-upper-price', [0,.85,.24],[.88,.03,.012],COLORS.label,'label');
       }
       add('front-glass', [0, .80, .46], [.95, .37, .018], COLORS.glass, 'glass');
       add('top-glass', [0, .985, .07], [.97, .018, .8], COLORS.glass, 'glass');

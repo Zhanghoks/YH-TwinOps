@@ -1,9 +1,16 @@
+import { StoreCustomers } from './StoreCustomers';
+import { DepartmentFloor } from './DepartmentFloor';
+import { useCityGroundTexture } from './CityGround';
+import { CityTraffic } from './CityTraffic';
+import { WeatherScene } from './WeatherScene';
+import { WEATHER_PRESETS,type SimulatedWeather } from './weatherModel';
+import { buildComponentSample, type ComponentSampleId } from './componentCatalog';
 import { buildReferenceCheckoutSigns } from './referenceSignage';
 import { REFERENCE_SERVICE_LABELS } from './referenceArchitecture';
 import { buildReferenceDisplayFixtures, type ReferenceRegion } from './planningLayout';
 /** StoreLayout-driven single-canvas scene; procedural detail never changes business geometry. */
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { buildSceneCamera, fitTopViewHeight, type CameraView } from './sceneCamera';
+import { buildEntranceSiteCamera, buildSceneCamera, fitTopViewHeight, type CameraView } from './sceneCamera';
 import { DetailedFixtures, StoreEnvelope } from './DetailedStore';
 import * as THREE from 'three';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
@@ -317,7 +324,7 @@ function ZoneNode({
   );
 }
 
-export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, referenceRegions }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; referenceRegions?: ReferenceRegion[] }) {
+export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, referenceRegions, componentId, weather = 'sunny', reducedMotion = false, cityPaused = false, cloudQuality = 'low', economy = true, showCustomers = true, customersPaused = false, operatingOccupancy, operatingOccupancyLabel = '平均在场估算', active = true, stocked = true }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; referenceRegions?: ReferenceRegion[]; componentId?: ComponentSampleId; weather?: SimulatedWeather; reducedMotion?: boolean; cityPaused?: boolean; cloudQuality?: 'off'|'low'|'high'; economy?: boolean; showCustomers?: boolean; customersPaused?: boolean; operatingOccupancy?: Record<string,number>; operatingOccupancyLabel?: string; active?: boolean; stocked?: boolean }) {
   const layer = useWorkbench((s) => s.layer);
   const selection = useWorkbench((s) => s.selection);
   const select = useWorkbench((s) => s.select);
@@ -352,21 +359,36 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
     return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2] as const;
   }, [zoneRects, layout, fixedCenter]);
 
-  const camera = buildSceneCamera(cameraView, groundCenter, layout.depthM, layout.widthM);
+  const [cityMetrics,setCityMetrics]=useState('采样中');
+  const cityGround = useCityGroundTexture(layout.widthM,layout.depthM);
+  const distantGround = useCityGroundTexture(layout.widthM,layout.depthM,true);
+  const sample = useMemo(() => componentId ? buildComponentSample(componentId) : undefined, [componentId]);
+  const lighting=WEATHER_PRESETS[sample ? 'sunny' : weather];
+  const sampleSpan = sample ? Math.max(sample.widthM, sample.depthM, sample.heightM) : 1;
+  const camera = sample ? { position: [sampleSpan*1.65, sampleSpan*1.15, sampleSpan*1.65] as [number, number, number], target: [0, sample.heightM*.45, 0] as [number, number, number] } : referenceRegions && cameraView === 'entrance' ? buildEntranceSiteCamera(groundCenter,layout.depthM,-22.5) : buildSceneCamera(cameraView, groundCenter, layout.depthM, layout.widthM);
   return (
-    <Canvas className="scene-canvas" key={`${cameraView}-${cameraRevision}`} shadows frameloop="demand" camera={{ position: camera.position, fov: 42 }} dpr={[1, 1.5]}>
+    <><Canvas className="scene-canvas" key={`${componentId ?? "store"}-${cameraView}-${cameraRevision}`} shadows={!economy} frameloop={active ? "demand" : "never"} camera={{ position: camera.position, fov: 42, near: .5, far: 1000 }} dpr={economy ? .85 : [1, 1.5]}>
       <SettleView revision={`${cameraView}-${cameraRevision}-${showLabels}-${!!referenceRegions}`} />
       <color attach="background" args={['#e8eceb']} />
+      {!sample&&<fog attach="fog" args={[lighting.horizon,cameraView==='site'?500:350,900]}/>}
+      {!sample && <WeatherScene cloudQuality={cloudQuality} weather={weather} width={layout.widthM} depth={layout.depthM} center={groundCenter} reducedMotion={reducedMotion} />}
+      {!sample && <CityTraffic width={layout.widthM} depth={layout.depthM} center={groundCenter} paused={cityPaused} onMetrics={setCityMetrics} />}
       {/* shell 模型自带较暗的烘焙色调，光照对齐老原型的强度口径 */}
-      <hemisphereLight args={[shellMode ? '#e5fff0' : '#fff3d9', shellMode ? '#34413e' : '#56615c', shellMode ? 2.1 : 1.05]} />
-      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : 2.65} color="#fff3de" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={referenceRegions ? -75 : -60} shadow-camera-right={referenceRegions ? 75 : 60} shadow-camera-top={referenceRegions ? 75 : 60} shadow-camera-bottom={referenceRegions ? -75 : -60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
-      <OrbitControls target={camera.target} maxPolarAngle={Math.PI / 2.05} minDistance={5} maxDistance={Math.max(220, layout.depthM * 4)} />
-      {referenceRegions && cameraView === 'top' && <FitReferenceTop width={layout.widthM} depth={layout.depthM} center={groundCenter} />}
+      <hemisphereLight args={[shellMode ? '#e5fff0' : '#fff3d9', shellMode ? '#34413e' : '#56615c', shellMode ? 2.1 : lighting.ambient]} />
+      <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : lighting.sun} color={lighting.sunColor} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={referenceRegions ? -75 : -60} shadow-camera-right={referenceRegions ? 75 : 60} shadow-camera-top={referenceRegions ? 75 : 60} shadow-camera-bottom={referenceRegions ? -75 : -60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
+      <OrbitControls target={camera.target} maxPolarAngle={Math.PI / 2.05} minDistance={sample ? 1 : 5} maxDistance={Math.max(220, layout.depthM * 4)} />
+      {!sample && referenceRegions && cameraView === 'top' && <FitReferenceTop width={layout.widthM} depth={layout.depthM} center={groundCenter} />}
 
+      {sample && <>
+        <DetailedFixtures stocked={stocked} fixtures={[]} decorations={[sample]} onSelect={() => {}} />
+        <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.015,0]} receiveShadow><planeGeometry args={[12,12]}/><meshStandardMaterial color="#e5e1d8" /></mesh>
+      </>}
+      {!sample && <>
       {/* 地面（白膜模式）与取消选择热区 */}
-      <mesh position={[groundCenter[0], detailed ? -0.04 : -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
-        <planeGeometry args={[layout.widthM + 40, layout.depthM + 40]} />
-        <meshStandardMaterial color={shellMode ? '#cfd6dd' : '#dee3e9'} />
+      <mesh position={[groundCenter[0],-.4,groundCenter[1]]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[layout.widthM+900,layout.depthM+900]}/><meshLambertMaterial map={distantGround}/></mesh>
+      <mesh position={[groundCenter[0], detailed ? -0.25 : -0.01, groundCenter[1]]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={() => select(null)}>
+        <planeGeometry args={[layout.widthM + 260, layout.depthM + 300]} />
+        <meshStandardMaterial map={cityGround} color={shellMode ? '#cfd6dd' : '#ffffff'} />
       </mesh>
       {!shellMode && !detailed && (
         <gridHelper args={[layout.widthM, layout.widthM / 2, '#c4ccd4', '#d8dee4']} position={[groundCenter[0], 0.005, groundCenter[1]]} />
@@ -375,8 +397,10 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
       {shellMode && <ShellModel url={manifest.shellUrl as string} onSelect={(id) => (id === null ? select(null) : select({ kind: 'fixture', id }))} />}
 
       {detailed && <>
+        {referenceRegions&&<DepartmentFloor regions={referenceRegions}/>}
         <StoreEnvelope layout={layout} center={groundCenter} reference={!!referenceRegions} />
-        <DetailedFixtures fixtures={layout.fixtures} decorations={referenceDisplays} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
+        {showCustomers && <StoreCustomers layout={layout} decorations={referenceDisplays} paused={customersPaused} />}
+        <DetailedFixtures stocked={stocked} compactFaces={economy} fixtures={layout.fixtures} decorations={referenceDisplays} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
       </>}
 
       <ReadyLabels>
@@ -400,8 +424,8 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
             zone={state}
             name={showLabels && (!referenceRegions || layer !== 'none') ? z.name : ''}
             rect={rect}
-            fill={colors.zoneFill(state)}
-            badge={colors.zoneBadge(state)}
+            fill={layer === 'traffic' && operatingOccupancy ? trafficColor(operatingOccupancy[z.zoneId] ?? 0) : colors.zoneFill(state)}
+            badge={layer === 'traffic' && operatingOccupancy ? `${operatingOccupancyLabel} ${operatingOccupancy[z.zoneId] ?? 0} 人（合成）` : colors.zoneBadge(state)}
             selected={selection?.kind === 'zone' && selection.id === z.zoneId}
             shellMode={shellMode || detailed}
             onSelect={(id) => select({ kind: 'zone', id })}
@@ -422,6 +446,8 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
         ))}
 
 
+      </>}
     </Canvas>
+    {!sample&&<div style={{position:"absolute",pointerEvents:"none",zIndex:22,right:16,top:170,background:"#fffdf1e8",padding:"4px 8px",fontSize:11,color:"#40534c"}}>城市模拟 · {cityPaused?"已静止":cityMetrics}（当前视角实测，非 GPU 耗时）</div>}</>
   );
 }
