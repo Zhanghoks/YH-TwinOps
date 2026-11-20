@@ -7,6 +7,7 @@ import {
 } from '../catalog/productCatalog';
 import './ProductCatalog.css';
 import {SameSkuFillPanel, type SameSkuFillControls} from './SameSkuFillPanel';
+import { PlacementTrialPanel, type PlacementTrialControls } from './PlacementTrialPanel';
 import { ProductModelPreview } from './ProductModelPreview';
 export type {FillPreview, SameSkuFillControls} from './SameSkuFillPanel';
 
@@ -43,9 +44,15 @@ function downloadCatalog(products: readonly ProductCatalogItem[]) {
   }
 }
 
-export function ProductCatalog({trialCounts,...fillControls}: {trialCounts?: TrialPlacementCounts} & SameSkuFillControls) {
+export function ProductCatalog({trialCounts, catalogItems, onCatalogSaved, placementTrial, ...fillControls}: {
+  trialCounts?: TrialPlacementCounts;
+  catalogItems?: readonly ProductCatalogItem[];
+  onCatalogSaved?: (products: ProductCatalogItem[]) => void;
+  placementTrial?: PlacementTrialControls;
+} & SameSkuFillControls) {
   const [initial] = useState(() => loadProductCatalog());
-  const [products, setProducts] = useState(initial.products);
+  const [storedProducts, setProducts] = useState(initial.products);
+  const products = catalogItems ?? storedProducts;
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<ProductCatalogItem['category']>();
   const [selection, setSelection] = useState<string | null>(null);
@@ -77,6 +84,7 @@ export function ProductCatalog({trialCounts,...fillControls}: {trialCounts?: Tri
       return false;
     }
     setProducts(next);
+    onCatalogSaved?.(next);
     setFeedback({text:message});
     setDraft(null);
     setRestore(false);
@@ -228,17 +236,18 @@ export function ProductCatalog({trialCounts,...fillControls}: {trialCounts?: Tri
               <label>商品名称<input required maxLength={80} value={draft.name} onChange={e => setDraft({...draft,name:e.currentTarget.value})}/></label>
               <label>商品规格<input required maxLength={200} value={draft.specification} onChange={e => setDraft({...draft,specification:e.currentTarget.value})}/></label>
               <label>备注<textarea maxLength={1000} rows={3} value={draft.notes} onChange={e => setDraft({...draft,notes:e.currentTarget.value})}/></label>
-              <p>SKU、三维模型、参考尺寸及位置映射不可编辑。保存不会改变 3D 模型或库存。</p>
+              <p>SKU、三维模型与参考尺寸不可编辑。保存资料不会改变 3D 模型、陈列位置或库存。</p>
               <div className="pc-actions"><Button type="submit" variant="accent">保存到此浏览器</Button><Button type="button" onClick={() => setDraft(null)}>取消编辑</Button></div>
             </form>}
             {selected.templateSku
-              ? <p className="pc-trial-readout">本机新增 · 复用模板 {selected.templateSku}，尚未关联货架陈列。</p>
+              ? <p className="pc-trial-readout">本机新增 · 复用模板 {selected.templateSku}，{trialCounts?.[selected.sku] ? `关联 ${trialCounts[selected.sku]} 个陈列位置（非库存）。` : '尚未关联货架陈列。'}</p>
               : <><p className="pc-trial-readout"><strong>关联试换陈列位置</strong> <span>{trialCounts ? `${trialCounts[selected.sku] ?? 0} 个${trialCounts[selected.sku] ? '' : '（未关联试换位置）'}` : '待关联'}</span></p>
                 {fillControls.previewFill && <details className="pc-trial-tools" open>
                   <summary><span>货架陈列试换</span><ChevronDown size={15} aria-hidden="true"/></summary>
                   <SameSkuFillPanel product={selected} {...fillControls}/>
                 </details>}
               </>}
+            {placementTrial && <PlacementTrialPanel key={selected.sku} product={selected} controls={placementTrial} />}
           </>}
         </section>
       </div>

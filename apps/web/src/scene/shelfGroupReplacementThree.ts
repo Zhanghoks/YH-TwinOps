@@ -7,6 +7,7 @@ import type { ShelfGroupPlacement, ShelfGroupReplacementModel } from './shelfGro
 import { detailPartsAtLod } from './detailLod';
 import { makeDetailedProduct } from './detailedProductThree';
 import {selectPlacementProductKind} from '../catalog/placementProductKind';
+import type { ShelfSlotReplacement } from '../catalog/merchandisingAdapter';
 
 export type ShelfProductStyle='legacy'|'detailed';
 
@@ -79,6 +80,21 @@ function appendItems(group:THREE.Group,model:ShelfGroupReplacementModel,products
   group.add(goods);
 }
 
+/** Mount the validated template at the existing source slot; no added/removed slot capacity. */
+function slotReplacementItem(model:ShelfGroupReplacementModel,p:ShelfGroupPlacement,replacement:ShelfSlotReplacement):THREE.Group {
+  const item=new THREE.Group();
+  item.name=`${model.fixtureId}-item-${p.sourceId}`;
+  item.userData={sku:replacement.sku,slotId:p.sourceId,detailedKind:replacement.modelKey,mount:p.mount.id,rack:p.rackIndex+1,origin:'USER_SANDBOX'};
+  const product=makeDetailedProduct({kind:replacement.modelKey,size:replacement.sizeM,color:replacement.color,lod:model.lod});
+  product.rotation.y=p.mount.side===-1 ? Math.PI : 0;
+  const actual=new THREE.Box3().setFromObject(product,true);
+  const center=actual.getCenter(new THREE.Vector3());
+  const [x,y,z]=p.slot.anchor;
+  product.position.set(x-center.x,y-actual.min.y,z-center.z);
+  item.add(product);
+  return item;
+}
+
 function batchScene(input:THREE.Group):THREE.Group{
   input.updateMatrixWorld(true);
   const buckets=new Map<string, {geometries:THREE.BufferGeometry[];material:THREE.MeshStandardMaterial;shadow:boolean}>();
@@ -119,7 +135,7 @@ function batchScene(input:THREE.Group):THREE.Group{
 }
 
 /** Transform is fixture-local; the caller applies the unchanged business-fixture origin and yaw. */
-export function makeShelfGroupReplacement(model:ShelfGroupReplacementModel,{batch=true,products='detailed',fillPlan}:{batch?:boolean;products?:ShelfProductStyle;fillPlan?:SameSkuFillResult}={}):THREE.Group{
+export function makeShelfGroupReplacement(model:ShelfGroupReplacementModel,{batch=true,products='detailed',fillPlan,placementReplacement}:{batch?:boolean;products?:ShelfProductStyle;fillPlan?:SameSkuFillResult;placementReplacement?:ShelfSlotReplacement}={}):THREE.Group{
   const group=new THREE.Group();
   group.name=model.fixtureId+' reversible gondola trial';
   const counts:Record<string,number>={};
@@ -128,10 +144,17 @@ export function makeShelfGroupReplacement(model:ShelfGroupReplacementModel,{batc
     sourceEnvelopeM:model.sourceEnvelopeM,replacementEnvelopeM:model.replacementEnvelopeM,lod:model.lod,stocked:model.stocked,counts,products};
   appendRack(group,model);
   const fill=model.fixtureId==='F077'&&model.stocked&&fillPlan?.ok ? fillPlan : undefined;
+  const target=model.fixtureId==='F077'&&model.stocked&&!fill&&placementReplacement
+    ? model.placements.find(p=>p.sourceId===placementReplacement.slotId) : undefined;
   const removed=new Set(fill?.replacedMountKeys ?? []);
-  const retained=fill ? {...model,placements:model.placements.filter(p=>!removed.has(sameSkuMountKey(p.rackIndex,p.mount)))} : model;
+  const retained=fill || target ? {...model,placements:model.placements.filter(p=>p!==target&&!removed.has(sameSkuMountKey(p.rackIndex,p.mount)))} : model;
   appendItems(group,retained,products);
   const output=batch ? batchScene(group):group;
+  if(target&&placementReplacement){
+    // The one changed object stays addressable even while the unchanged structure and products are batched.
+    output.add(slotReplacementItem(model,target,placementReplacement));
+    output.userData.placementReplacement={slotId:target.sourceId,sku:placementReplacement.sku};
+  }
   if(fill){output.add(makeSameSkuFillProducts(fill,model.lod));output.userData.fillCount=fill.placements.length;output.userData.retainedCount=retained.placements.length;output.userData.productCount=retained.placements.length+fill.placements.length;}
   return output;
 }

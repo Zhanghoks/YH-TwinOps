@@ -1,0 +1,8 @@
+{
+  "name":"@yh/merchandising",
+  "version":"0.1.0",
+  "type":"module",
+  "license":"AGPL-3.0-only",
+  "exports":{".":"./src/index.ts","./authority":"./src/authority.ts"},
+  "dependencies":{"@yh/contracts":"0.1.0"}
+}

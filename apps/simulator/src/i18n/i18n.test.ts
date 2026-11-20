@@ -70,9 +70,9 @@ describe('界面英文', () => {
   it('模拟器和引擎里出现的每一段中文都有英文译文', () => {
     applyLang('en', false);
     // packages/yard、packages/overlap-audit 是第三部分（StoreX 全链路）用的两个独立程序库，不在模拟器界面里显示，不用这里的英文对照。
-    // packages/contracts、twin-state、simulation、agent 是 YH-TwinOps v3 的新孪生后端（@yh/*），不被模拟器界面引用；
+    // packages/contracts、twin-state、simulation、agent、merchandising 属于 YH-TwinOps v3（@yh/*），不被模拟器界面引用；
     // v3 的店长问答以中文为第一语言（见 docs/PRD 与 assets/ 规范），与模拟器 i18n 目录解耦。
-    const sources = [...files(ROOT), ...files(ENGINE).filter((p) => p.includes('/src/') && !/[\\/]packages[\\/](yard|overlap-audit|contracts|twin-state|simulation|agent)[\\/]/.test(p))];
+    const sources = [...files(ROOT), ...files(ENGINE).filter((p) => p.includes('/src/') && !/[\\/]packages[\\/](yard|overlap-audit|contracts|twin-state|simulation|agent|merchandising)[\\/]/.test(p))];
     const missing = new Set<string>();
     for (const p of sources) {
       for (const s of chineseLiterals(readFileSync(p, 'utf8'))) {

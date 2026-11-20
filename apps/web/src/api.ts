@@ -5,7 +5,7 @@
 
 import type { AgentAnswer } from '@yh/agent/rules';
 import type { PiAgentAnswer } from '@yh/agent';
-import type { StoreLayout, TwinSignal } from '@yh/contracts';
+import type { StoreLayout, TwinSignal, MerchandisingSubmission } from '@yh/contracts';
 
 export type StoreAgentAnswer = AgentAnswer | PiAgentAnswer;
 
@@ -32,6 +32,7 @@ export async function askStoreAgent(input: {
   at: string;
   layout: StoreLayout;
   signals: TwinSignal[];
+  merchandising?: MerchandisingSubmission;
 }): Promise<StoreAgentAnswer> {
   const res = await fetch('/api/agent/ask', {
     method: 'POST',

@@ -5,7 +5,7 @@
 import { Bot, MessagesSquare, Bell, GitCompareArrows, ShieldCheck } from 'lucide-react';
 import { Tabs, TabsIndicator, TabsList, TabsPanel, TabsTab } from '@ui-sdk/react/tabs';
 import type { AgentTools } from '@yh/agent/tools';
-import type { StoreLayout, TwinSignal, TwinSnapshot } from '@yh/contracts';
+import type { MerchandisingSnapshot, MerchandisingSubmission, StoreLayout, TwinSignal, TwinSnapshot } from '@yh/contracts';
 import type { ApprovalsClient } from '../api';
 import { SelectionInfo } from './SelectionInfo';
 import { AlertsPanel } from './AlertsPanel';
@@ -29,6 +29,11 @@ export interface AgentShellProps {
   tools: AgentTools;
   signals: TwinSignal[];
   layout: StoreLayout;
+  merchandising?: MerchandisingSnapshot;
+  merchandisingSubmission?: MerchandisingSubmission;
+  selectedSlotId?: string;
+  onSelectSlot?: (slotId: string) => void;
+  onInjectStock?: (sku: string, fixtureId: string) => void;
   at: string;
   seed: number;
   client: ApprovalsClient | null;
@@ -44,6 +49,11 @@ export function AgentShell({
   tools,
   signals,
   layout,
+  merchandising,
+  merchandisingSubmission,
+  selectedSlotId,
+  onSelectSlot,
+  onInjectStock,
   at,
   seed,
   client,
@@ -78,7 +88,7 @@ export function AgentShell({
           ))}
         </TabsList>
         <TabsPanel value="agent" className="agent-shell-body">
-          <AgentPanel tools={tools} signals={signals} layout={layout} at={at} />
+          <AgentPanel tools={tools} signals={signals} layout={layout} at={at} merchandisingSubmission={merchandisingSubmission} />
         </TabsPanel>
         <TabsPanel value="alerts" className="agent-shell-body">
           <AlertsPanel snapshot={snapshot} />
@@ -92,7 +102,7 @@ export function AgentShell({
       </Tabs>
 
       <footer className="statusbar">
-        <details className="ba-scene-details"><summary>场景与数据 · {snapshot.coverage.totalSignals} 条信号</summary><div className="ba-scene-popover"><SelectionInfo snapshot={snapshot} /><p>合成信号 {snapshot.coverage.syntheticSignals} 条 · {at}</p><p>建议与推演，不直接执行门店操作</p></div></details>
+        <details className="ba-scene-details"><summary>场景与数据{selectedSlotId ? ' · 已选货位' : ''} · {snapshot.coverage.totalSignals} 条信号</summary><div className="ba-scene-popover"><SelectionInfo snapshot={snapshot} layout={layout} merchandising={merchandising} selectedSlotId={selectedSlotId} onSelectSlot={onSelectSlot} onInjectStock={onInjectStock} /><p>合成信号 {snapshot.coverage.syntheticSignals} 条 · {at}</p><p>建议与推演，不直接执行门店操作</p></div></details>
         <span title={`快照 ${snapshot.snapshotId}`}>审批沙盒：{client === null ? '连接中' : client.mode === 'api' ? 'API 已连接' : '本地降级'}</span>
       </footer>
     </aside>

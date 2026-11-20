@@ -1,3 +1,4 @@
+import type {ShelfSlotReplacement} from '../catalog/merchandisingAdapter';
 import type {SameSkuFillRequest} from './sameSkuFill';
 import { ReplacementPilotPreview, isReplacementPilotFixture } from './ReplacementPilotPreview';
 import { F032TrialPreview } from './F032TrialPreview';
@@ -112,8 +113,8 @@ function Batch({ instances, primitive, material, onSelect, lod, boxSides }: {
   );
 }
 
-export function DetailedFixtures({ fixtures, decorations = [], selectedId, onSelect, compactFaces = false, stocked = true, f032Trial = false, pilotTrials = [], fillRequest }: {
-  fixtures: Fixture[]; decorations?: DetailFixtureShape[]; selectedId?: string; compactFaces?: boolean; stocked?: boolean; f032Trial?: boolean; pilotTrials?: readonly string[]; fillRequest?:SameSkuFillRequest; onSelect: (id: string) => void;
+export function DetailedFixtures({ fixtures, decorations = [], selectedId, onSelect, compactFaces = false, stocked = true, f032Trial = false, pilotTrials = [], fillRequest, placementReplacement }: {
+  fixtures: Fixture[]; decorations?: DetailFixtureShape[]; selectedId?: string; compactFaces?: boolean; stocked?: boolean; f032Trial?: boolean; pilotTrials?: readonly string[]; fillRequest?:SameSkuFillRequest; placementReplacement?:ShelfSlotReplacement; onSelect: (id: string) => void;
 }) {
   const camera=useThree(state=>state.camera);
   const pilotFixtures=useMemo(()=>fixtures.filter(f=>pilotTrials.includes(f.fixtureId)&&isReplacementPilotFixture(f)),[fixtures,pilotTrials]);
@@ -151,7 +152,7 @@ export function DetailedFixtures({ fixtures, decorations = [], selectedId, onSel
   const trialFixture=f032Trial?fixtures.find(isDenseF032Fixture):undefined;
   const selected = fixtures.find((f) => f.fixtureId === selectedId && f!==trialFixture && !pilotFixtures.includes(f));
   return <group>
-    {pilotFixtures.map(f=><ReplacementPilotPreview fillRequest={f.fixtureId==='F077'?fillRequest:undefined} key={f.fixtureId} fixture={f} stocked={stocked||(f.fixtureId==='F077'&&!!fillRequest)} selected={selectedId===f.fixtureId} onSelect={onSelect}/>)}
+    {pilotFixtures.map(f=><ReplacementPilotPreview placementReplacement={f.fixtureId==='F077'?placementReplacement:undefined} fillRequest={f.fixtureId==='F077'?fillRequest:undefined} key={f.fixtureId} fixture={f} stocked={stocked||(f.fixtureId==='F077'&&!!fillRequest)} selected={selectedId===f.fixtureId} onSelect={onSelect}/>)}
     {trialFixture && <F032TrialPreview fixture={trialFixture} stocked={stocked} selected={selectedId===trialFixture.fixtureId} onSelect={onSelect}/>}
     {batches.map((batch) => <Batch key={`${batch.lod}-${batch.material}-${batch.primitive}-${batch.boxSides}`} {...batch} onSelect={onSelect} />)}
     {selected !== undefined && <group position={[selected.x, selected.y + selected.heightM / 2, selected.z]} rotation={[0, selected.rotationY, 0]}>

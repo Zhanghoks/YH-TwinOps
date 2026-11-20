@@ -1,0 +1,21 @@
+.yh-selection-placement {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--review-line);
+  padding-top: 6px;
+}
+.yh-selection-placement h4,
+.yh-selection-placement p { margin: 0; }
+.yh-selection-placement p,
+.yh-selection-placement label { color: var(--review-muted); font-size: 11px; }
+.yh-selection-placement label { display: grid; gap: 4px; }
+.yh-selection-placement select {
+  color: var(--review-ink);
+  background: var(--review-inset);
+  border: 1px solid var(--review-line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  width: 100%;
+  min-width: 0;
+}
+.yh-selection-placement button { justify-self: start; }
