@@ -1,3 +1,7 @@
+import type {SameSkuFillRequest} from './sameSkuFill';
+import { ReplacementPilotPreview, isReplacementPilotFixture } from './ReplacementPilotPreview';
+import { F032TrialPreview } from './F032TrialPreview';
+import { isDenseF032Fixture } from './f032Replacement';
 import { buildCityFacadePixels,hasCityFacade } from './cityFacade';
 import { buildUrbanFabric } from './urbanFabric';
 import { detailPartsAtLod, fixtureDetailLod, distantBoxSides, visibleBoxFaceIndices, type BoxSides, type DetailLod } from './detailLod';
@@ -108,15 +112,16 @@ function Batch({ instances, primitive, material, onSelect, lod, boxSides }: {
   );
 }
 
-export function DetailedFixtures({ fixtures, decorations = [], selectedId, onSelect, compactFaces = false, stocked = true }: {
-  fixtures: Fixture[]; decorations?: DetailFixtureShape[]; selectedId?: string; compactFaces?: boolean; stocked?: boolean; onSelect: (id: string) => void;
+export function DetailedFixtures({ fixtures, decorations = [], selectedId, onSelect, compactFaces = false, stocked = true, f032Trial = false, pilotTrials = [], fillRequest }: {
+  fixtures: Fixture[]; decorations?: DetailFixtureShape[]; selectedId?: string; compactFaces?: boolean; stocked?: boolean; f032Trial?: boolean; pilotTrials?: readonly string[]; fillRequest?:SameSkuFillRequest; onSelect: (id: string) => void;
 }) {
   const camera=useThree(state=>state.camera);
+  const pilotFixtures=useMemo(()=>fixtures.filter(f=>pilotTrials.includes(f.fixtureId)&&isReplacementPilotFixture(f)),[fixtures,pilotTrials]);
   // Cache full component construction across camera and selection changes.
   const sources=useMemo(()=>[
-    ...fixtures.map(fixture=>({fixture,parts:buildFixtureDetail(fixture, { stocked }),farParts:buildFixtureDetail(fixture, { stocked, lod: 'far' }),selectable:true})),
+    ...fixtures.filter(f=>!(f032Trial&&isDenseF032Fixture(f))&&!pilotFixtures.includes(f)).map(fixture=>({fixture,parts:buildFixtureDetail(fixture, { stocked }),farParts:buildFixtureDetail(fixture, { stocked, lod: 'far' }),selectable:true})),
     ...decorations.map(fixture=>({fixture,parts:buildFixtureDetail(fixture, { stocked }),farParts:buildFixtureDetail(fixture, { stocked, lod: 'far' }),selectable:false})),
-  ],[fixtures,decorations,stocked]);
+  ],[fixtures,decorations,stocked,f032Trial,pilotFixtures]);
   const [levels,setLevels]=useState<Record<string,DetailLod>>({});
   const [sides,setSides]=useState<Record<string,BoxSides|undefined>>({});
   const lastCamera=useRef(new THREE.Vector3(Infinity,Infinity,Infinity));
@@ -143,8 +148,11 @@ export function DetailedFixtures({ fixtures, decorations = [], selectedId, onSel
       }))
     ))).filter(({instances})=>instances.length>0);
   }, [sources,levels,sides,selectedId,camera,compactFaces]);
-  const selected = fixtures.find((f) => f.fixtureId === selectedId);
+  const trialFixture=f032Trial?fixtures.find(isDenseF032Fixture):undefined;
+  const selected = fixtures.find((f) => f.fixtureId === selectedId && f!==trialFixture && !pilotFixtures.includes(f));
   return <group>
+    {pilotFixtures.map(f=><ReplacementPilotPreview fillRequest={f.fixtureId==='F077'?fillRequest:undefined} key={f.fixtureId} fixture={f} stocked={stocked||(f.fixtureId==='F077'&&!!fillRequest)} selected={selectedId===f.fixtureId} onSelect={onSelect}/>)}
+    {trialFixture && <F032TrialPreview fixture={trialFixture} stocked={stocked} selected={selectedId===trialFixture.fixtureId} onSelect={onSelect}/>}
     {batches.map((batch) => <Batch key={`${batch.lod}-${batch.material}-${batch.primitive}-${batch.boxSides}`} {...batch} onSelect={onSelect} />)}
     {selected !== undefined && <group position={[selected.x, selected.y + selected.heightM / 2, selected.z]} rotation={[0, selected.rotationY, 0]}>
       <mesh>

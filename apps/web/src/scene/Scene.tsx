@@ -1,3 +1,7 @@
+import type {SameSkuFillRequest} from './sameSkuFill';
+import { RetailFixturePreview } from './RetailFixturePreview';
+import { RefrigerationFixturePreview } from './RefrigerationFixturePreview';
+import { DimensionedShelfPreview } from './DimensionedShelfPreview';
 import { StoreCustomers } from './StoreCustomers';
 import { DepartmentFloor } from './DepartmentFloor';
 import { useCityGroundTexture } from './CityGround';
@@ -9,7 +13,7 @@ import { buildReferenceCheckoutSigns } from './referenceSignage';
 import { REFERENCE_SERVICE_LABELS } from './referenceArchitecture';
 import { buildReferenceDisplayFixtures, type ReferenceRegion } from './planningLayout';
 /** StoreLayout-driven single-canvas scene; procedural detail never changes business geometry. */
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { buildEntranceSiteCamera, buildSceneCamera, fitTopViewHeight, type CameraView } from './sceneCamera';
 import { DetailedFixtures, StoreEnvelope } from './DetailedStore';
 import * as THREE from 'three';
@@ -36,19 +40,43 @@ function SettleView({ revision }: { revision: string }) {
   return null;
 }
 
-/** Candidate top view refits on focus-mode/window resize, not on every animation frame. */
-function FitReferenceTop({ width, depth, center }: { width: number; depth: number; center: readonly [number, number] }) {
-  const { camera, size, invalidate } = useThree();
-  useEffect(() => {
-    camera.position.set(center[0], fitTopViewHeight(width, depth, size.width, size.height), center[1] + .1);
-    camera.lookAt(center[0], 0, center[1]);
+const INITIAL_CAMERA = { fov: 42, near: .5, far: 1000 };
+
+/** Keeping the R3F root alive prevents DOM labels being removed twice on camera changes. */
+function SceneCameraRig({ position, target, revision, fitWidth, fitDepth, minDistance, maxDistance }: {
+  position: readonly [number, number, number]; target: readonly [number, number, number];
+  revision: number; fitWidth?: number; fitDepth?: number; minDistance: number; maxDistance: number;
+}) {
+  const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
+  const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
+  const invalidate = useThree((state) => state.invalidate);
+  const [x, initialY, z] = position;
+  const [tx, ty, tz] = target;
+  // Refit the top map after panel changes without resetting ordinary hand-operated orbit or zoom.
+  const y = fitWidth !== undefined && fitDepth !== undefined && size.width > 0 && size.height > 0
+    ? fitTopViewHeight(fitWidth, fitDepth, size.width, size.height)
+    : initialY;
+
+  useLayoutEffect(() => {
+    const orbit = controls.current;
+    if (orbit === null) return;
+    const damping = orbit.enableDamping;
+    orbit.enableDamping = false;
+    // Reset pending drag/dolly deltas before jumping to the explicit viewport.
+    orbit.reset();
+    orbit.target.set(tx, ty, tz);
+    camera.position.set(x, y, z);
+    orbit.update();
+    orbit.enableDamping = damping;
     camera.updateProjectionMatrix();
     invalidate();
-  }, [camera, size.width, size.height, width, depth, center[0], center[1], invalidate]);
-  return null;
+  }, [camera, invalidate, revision, x, y, z, tx, ty, tz]);
+
+  return <OrbitControls ref={controls} maxPolarAngle={Math.PI / 2.05} minDistance={minDistance} maxDistance={maxDistance} />;
 }
 
-/** Mount DOM annotations only after the new camera and controls have settled. */
+/** Mount DOM annotations only after the initial camera and controls have settled. */
 function ReadyLabels({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -283,6 +311,8 @@ function ShellModel({ url, onSelect }: { url: string; onSelect: (id: string | nu
 function ZoneNode({
   zone,
   name,
+  labelVisible,
+  planeVisible,
   rect,
   fill,
   badge,
@@ -292,6 +322,8 @@ function ZoneNode({
 }: {
   zone: ZoneState;
   name: string;
+  labelVisible: boolean;
+  planeVisible: boolean;
   rect: readonly [number, number, number, number];
   fill: string;
   badge: string;
@@ -310,21 +342,21 @@ function ZoneNode({
   const opacity = shellMode ? (selected ? 0.5 : badge === '' && !selected ? 0.02 : 0.26) : selected ? 0.98 : 0.8;
   return (
     <group>
-      <mesh position={[cx, 0.03, cz]} rotation={[-Math.PI / 2, 0, 0]} onPointerDown={handleClick}>
+      <mesh position={[cx, 0.03, cz]} rotation={[-Math.PI / 2, 0, 0]} visible={planeVisible} onPointerDown={planeVisible ? handleClick : undefined}>
         <planeGeometry args={[x1 - x0, z1 - z0]} />
         <meshBasicMaterial color={fill} transparent opacity={opacity} depthWrite={false} />
       </mesh>
-      {name !== '' && <Html position={[cx, shellMode ? 2.6 : 0.6, cz]} center zIndexRange={[10, 0]}>
+      <Html position={[cx, shellMode ? 2.6 : 0.6, cz]} center zIndexRange={[10, 0]} style={{visibility:labelVisible ? 'visible' : 'hidden'}}>
         <div className={`zone-label${selected ? ' is-selected' : ''}`} style={{ pointerEvents: 'none' }}>
           <strong>{name.split(' / ')[0]}</strong>
           {badge !== '' && <span>{badge}</span>}
         </div>
-      </Html>}
+      </Html>
     </group>
   );
 }
 
-export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, referenceRegions, componentId, weather = 'sunny', reducedMotion = false, cityPaused = false, cloudQuality = 'low', economy = true, showCustomers = true, customersPaused = false, operatingOccupancy, operatingOccupancyLabel = '平均在场估算', active = true, stocked = true }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; referenceRegions?: ReferenceRegion[]; componentId?: ComponentSampleId; weather?: SimulatedWeather; reducedMotion?: boolean; cityPaused?: boolean; cloudQuality?: 'off'|'low'|'high'; economy?: boolean; showCustomers?: boolean; customersPaused?: boolean; operatingOccupancy?: Record<string,number>; operatingOccupancyLabel?: string; active?: boolean; stocked?: boolean }) {
+export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, referenceRegions, componentId, weather = 'sunny', reducedMotion = false, cityPaused = false, cloudQuality = 'low', economy = true, showCustomers = true, customersPaused = false, operatingOccupancy, operatingOccupancyLabel = '平均在场估算', active = true, stocked = true, f032Trial = false, pilotTrials = [], fillRequest }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; referenceRegions?: ReferenceRegion[]; componentId?: ComponentSampleId; weather?: SimulatedWeather; reducedMotion?: boolean; cityPaused?: boolean; cloudQuality?: 'off'|'low'|'high'; economy?: boolean; showCustomers?: boolean; customersPaused?: boolean; operatingOccupancy?: Record<string,number>; operatingOccupancyLabel?: string; active?: boolean; stocked?: boolean; f032Trial?: boolean; pilotTrials?: readonly string[]; fillRequest?:SameSkuFillRequest }) {
   const layer = useWorkbench((s) => s.layer);
   const selection = useWorkbench((s) => s.selection);
   const select = useWorkbench((s) => s.select);
@@ -366,8 +398,11 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
   const lighting=WEATHER_PRESETS[sample ? 'sunny' : weather];
   const sampleSpan = sample ? Math.max(sample.widthM, sample.depthM, sample.heightM) : 1;
   const camera = sample ? { position: [sampleSpan*1.65, sampleSpan*1.15, sampleSpan*1.65] as [number, number, number], target: [0, sample.heightM*.45, 0] as [number, number, number] } : referenceRegions && cameraView === 'entrance' ? buildEntranceSiteCamera(groundCenter,layout.depthM,-22.5) : buildSceneCamera(cameraView, groundCenter, layout.depthM, layout.widthM);
+  const fitTop = !sample && !!referenceRegions && cameraView === 'top';
+  const drawReferenceLabels = !sample && showLabels && !!referenceRegions && layer === 'none';
+  const referenceLabelStyle = { visibility: drawReferenceLabels ? 'visible' : 'hidden' } as const;
   return (
-    <><Canvas className="scene-canvas" key={`${componentId ?? "store"}-${cameraView}-${cameraRevision}`} shadows={!economy} frameloop={active ? "demand" : "never"} camera={{ position: camera.position, fov: 42, near: .5, far: 1000 }} dpr={economy ? .85 : [1, 1.5]}>
+    <><Canvas className="scene-canvas" shadows={!economy} frameloop={active ? "demand" : "never"} camera={INITIAL_CAMERA} dpr={economy ? .85 : [1, 1.5]}>
       <SettleView revision={`${cameraView}-${cameraRevision}-${showLabels}-${!!referenceRegions}`} />
       <color attach="background" args={['#e8eceb']} />
       {!sample&&<fog attach="fog" args={[lighting.horizon,cameraView==='site'?500:350,900]}/>}
@@ -376,11 +411,10 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
       {/* shell 模型自带较暗的烘焙色调，光照对齐老原型的强度口径 */}
       <hemisphereLight args={[shellMode ? '#e5fff0' : '#fff3d9', shellMode ? '#34413e' : '#56615c', shellMode ? 2.1 : lighting.ambient]} />
       <directionalLight position={[20, 60, 35]} intensity={shellMode ? 2.1 : lighting.sun} color={lighting.sunColor} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={referenceRegions ? -75 : -60} shadow-camera-right={referenceRegions ? 75 : 60} shadow-camera-top={referenceRegions ? 75 : 60} shadow-camera-bottom={referenceRegions ? -75 : -60} shadow-camera-far={150} shadow-normalBias={0.05} shadow-bias={-0.0002} />
-      <OrbitControls target={camera.target} maxPolarAngle={Math.PI / 2.05} minDistance={sample ? 1 : 5} maxDistance={Math.max(220, layout.depthM * 4)} />
-      {!sample && referenceRegions && cameraView === 'top' && <FitReferenceTop width={layout.widthM} depth={layout.depthM} center={groundCenter} />}
+      <SceneCameraRig position={camera.position} target={camera.target} revision={cameraRevision} fitWidth={fitTop ? layout.widthM : undefined} fitDepth={fitTop ? layout.depthM : undefined} minDistance={sample ? 1 : 5} maxDistance={Math.max(220, layout.depthM * 4)} />
 
       {sample && <>
-        <DetailedFixtures stocked={stocked} fixtures={[]} decorations={[sample]} onSelect={() => {}} />
+        {componentId === 'retail-produce' || componentId === 'retail-service' || componentId === 'retail-checkout' ? <RetailFixturePreview kind={componentId === 'retail-produce' ? 'produce' : componentId === 'retail-service' ? 'service' : 'checkout'} /> : componentId === 'refrigeration-island' || componentId === 'refrigeration-upright' || componentId === 'refrigeration-open' ? <RefrigerationFixturePreview kind={componentId === 'refrigeration-island' ? 'island' : componentId === 'refrigeration-upright' ? 'upright' : 'open'} /> : componentId === 'dimensioned-wall' || componentId === 'dimensioned-gondola' ? <DimensionedShelfPreview kind={componentId === 'dimensioned-wall' ? 'wall' : 'gondola'} /> : <DetailedFixtures stocked={stocked} fixtures={[]} decorations={[sample]} onSelect={() => {}} />}
         <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.015,0]} receiveShadow><planeGeometry args={[12,12]}/><meshStandardMaterial color="#e5e1d8" /></mesh>
       </>}
       {!sample && <>
@@ -400,16 +434,18 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
         {referenceRegions&&<DepartmentFloor regions={referenceRegions}/>}
         <StoreEnvelope layout={layout} center={groundCenter} reference={!!referenceRegions} />
         {showCustomers && <StoreCustomers layout={layout} decorations={referenceDisplays} paused={customersPaused} />}
-        <DetailedFixtures stocked={stocked} compactFaces={economy} fixtures={layout.fixtures} decorations={referenceDisplays} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
+        <DetailedFixtures fillRequest={fillRequest} pilotTrials={pilotTrials} f032Trial={f032Trial} stocked={stocked} compactFaces={economy} fixtures={layout.fixtures} decorations={referenceDisplays} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
+      </>}
       </>}
 
+      {/* Visibility toggles must not destroy subordinate React roots owned by Html. */}
       <ReadyLabels>
-      {referenceRegions && showLabels && layer === 'none' && checkoutSigns.map((sign) => <Html wrapperClass="reference-html-anchor" key={`sign-${sign.fixtureId}`} position={sign.position} center zIndexRange={[8,0]}><span className="reference-checkout-number" aria-label={`图示收银通道 ${sign.text}，非业务编号`}>{sign.text}</span></Html>)}
-      {referenceRegions && showLabels && layer === 'none' && referenceRegions.filter((region) => region.code !== 'BACK').map((region) => <Html wrapperClass="reference-html-anchor" key={region.code} position={[(region.bounds.x0 + region.bounds.x1) / 2, 3, (region.bounds.z0 + region.bounds.z1) / 2]} center zIndexRange={[10, 0]}>
+      {referenceRegions && checkoutSigns.map((sign) => <Html wrapperClass="reference-html-anchor" style={referenceLabelStyle} key={`sign-${sign.fixtureId}`} position={sign.position} center zIndexRange={[8,0]}><span className="reference-checkout-number" aria-label={`图示收银通道 ${sign.text}，非业务编号`}>{sign.text}</span></Html>)}
+      {referenceRegions && referenceRegions.filter((region) => region.code !== 'BACK').map((region) => <Html wrapperClass="reference-html-anchor" style={referenceLabelStyle} key={region.code} position={[(region.bounds.x0 + region.bounds.x1) / 2, 3, (region.bounds.z0 + region.bounds.z1) / 2]} center zIndexRange={[10, 0]}>
         <div className="zone-label reference-label"><strong>{region.label}</strong><span>{region.code === 'BACK' ? '参考图后勤带' : region.code} · 图面分区</span></div>
       </Html>)}
 
-      {referenceRegions && showLabels && layer === 'none' && REFERENCE_SERVICE_LABELS.filter((item) => item.id !== 'service' && item.id !== 'entry').map((item) => <Html wrapperClass="reference-html-anchor" key={item.id} position={[...item.position]} center zIndexRange={[10, 0]}><div className="zone-label reference-label"><strong>{item.id === 'chilled' ? '冷藏' : item.id === 'frozen' ? '冷冻' : item.text}</strong><span>图面推定</span></div></Html>)}
+      {referenceRegions && REFERENCE_SERVICE_LABELS.filter((item) => item.id !== 'service' && item.id !== 'entry').map((item) => <Html wrapperClass="reference-html-anchor" style={referenceLabelStyle} key={item.id} position={[...item.position]} center zIndexRange={[10, 0]}><div className="zone-label reference-label"><strong>{item.id === 'chilled' ? '冷藏' : item.id === 'frozen' ? '冷冻' : item.text}</strong><span>图面推定</span></div></Html>)}
 
       </ReadyLabels>
 
@@ -422,7 +458,9 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
           <ZoneNode
             key={z.zoneId}
             zone={state}
-            name={showLabels && (!referenceRegions || layer !== 'none') ? z.name : ''}
+            name={z.name}
+            labelVisible={!sample && showLabels && (!referenceRegions || layer !== 'none')}
+            planeVisible={!sample}
             rect={rect}
             fill={layer === 'traffic' && operatingOccupancy ? trafficColor(operatingOccupancy[z.zoneId] ?? 0) : colors.zoneFill(state)}
             badge={layer === 'traffic' && operatingOccupancy ? `${operatingOccupancyLabel} ${operatingOccupancy[z.zoneId] ?? 0} 人（合成）` : colors.zoneBadge(state)}
@@ -434,7 +472,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
       })}
 
       {/* 白膜模式的设施渲染（shell 模式下设施视觉来自外壳模型，点击拾取走节点名） */}
-      {!shellMode && !detailed &&
+      {!sample && !shellMode && !detailed &&
         layout.fixtures.map((f) => (
           <FixtureNode
             key={f.fixtureId}
@@ -444,9 +482,6 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
             onSelect={(id) => select({ kind: 'fixture', id })}
           />
         ))}
-
-
-      </>}
     </Canvas>
     {!sample&&<div style={{position:"absolute",pointerEvents:"none",zIndex:22,right:16,top:170,background:"#fffdf1e8",padding:"4px 8px",fontSize:11,color:"#40534c"}}>城市模拟 · {cityPaused?"已静止":cityMetrics}（当前视角实测，非 GPU 耗时）</div>}</>
   );

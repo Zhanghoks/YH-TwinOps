@@ -18,6 +18,14 @@ export const COMPONENT_SAMPLES = [
   { id: 'cart', name: '16 购物车区', type: 'OTHER', zone: 'design-only', size: [3.2, 1.2, 1.1] },
   { id: 'coldDoor', name: '17 冷库门', type: 'DOOR', zone: 'design-only', size: [2, .12, 2.4] },
   { id: 'dock', name: '18 装卸收货月台', type: 'OTHER', zone: 'design-only', size: [3, 2.5, 3.6] },
+  { id: 'dimensioned-wall', name: '19 定尺靠墙空架', type: 'OTHER', zone: 'design-only', size: [2.4, .47, 2.2] },
+  { id: 'dimensioned-gondola', name: '20 定尺双面空架', type: 'OTHER', zone: 'design-only', size: [2.4, 1, 1.6] },
+  { id: 'refrigeration-island', name: '21 滑盖冷冻岛柜', type: 'OTHER', zone: 'design-only', size: [2.502, .853, .833] },
+  { id: 'refrigeration-upright', name: '22 玻璃门冷冻柜', type: 'OTHER', zone: 'design-only', size: [1.350, .908, 2.035] },
+  { id: 'refrigeration-open', name: '23 多层冷藏风幕柜', type: 'OTHER', zone: 'design-only', size: [2.580, .915, 2.090] },
+  { id: 'retail-produce', name: '24 双面果蔬空台', type: 'OTHER', zone: 'design-only', size: [1.220, 1.450, .940] },
+  { id: 'retail-service', name: '25 鲜食玻璃服务柜', type: 'OTHER', zone: 'design-only', size: [1.955, 1.086, 1.290] },
+  { id: 'retail-checkout', name: '26 人工收银工作台', type: 'OTHER', zone: 'design-only', size: [2.500, 1.120, 1.150] },
 ] as const;
 export type ComponentSampleId = typeof COMPONENT_SAMPLES[number]['id'];
 /** Isolated design samples never enter StoreLayout or the business selection store. */

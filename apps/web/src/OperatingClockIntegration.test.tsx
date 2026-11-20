@@ -24,6 +24,10 @@ describe('shared live scenario and manual review', () => {
     act(() => vi.advanceTimersByTime(40_000));
     expect(screen.getByTestId('agent-clock').textContent).toBe('2026-11-13T01:13:00.000Z');
     expect(screen.getByRole('button',{name:'chat preserved'})).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio',{name:'经营看板'}));
+    fireEvent.click(screen.getByRole('radio',{name:'3D 孪生'}));
+    expect(screen.getByRole('button',{name:'chat preserved'})).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio',{name:'经营看板'}));
     fireEvent.change(screen.getByRole('combobox',{name:'经营模拟时段'}),{target:{value:'18'}});
     const manualAt = screen.getByTestId('agent-clock').textContent;
     act(() => vi.advanceTimersByTime(60_000));

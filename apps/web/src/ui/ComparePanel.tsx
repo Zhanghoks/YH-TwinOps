@@ -4,6 +4,8 @@ import { isDecisionUsable, METRICS, type TwinSnapshot } from '@yh/contracts';
 import { checkoutBaseline, TEACHING_WAGE_CNY_PER_HOUR, type CheckoutScenario, type ScenarioStat } from '@yh/simulation';
 import type { AgentTools } from '@yh/agent/tools';
 import type { ApprovalsClient } from '../api';
+import { BeautifulButton } from './beautiful/Button';
+import { ReviewHeading, ReviewNotice } from './ReviewTabs';
 
 interface ScenarioRow {
   name: string;
@@ -43,13 +45,11 @@ function compareScenarios(tools: AgentTools, seed: number): CompareData | null {
 }
 
 function StatLine({ label, stat, unit }: { label: string; stat?: ScenarioStat; unit: string }): React.JSX.Element {
-  if (stat === undefined) return <div className="muted">{label}：—</div>;
   return (
-    <div>
-      {label}：<strong>{stat.mean}</strong> {unit}
-      <span className="muted">
-        （±{stat.std}，范围 {stat.min}–{stat.max}）
-      </span>
+    <div className="yh-review-stat">
+      <span>{label}</span>
+      <strong>{stat === undefined ? '—' : <> {stat.mean} <small>{unit}</small></>}</strong>
+      {stat !== undefined && <small>±{stat.std} · {stat.min}–{stat.max}</small>}
     </div>
   );
 }
@@ -80,9 +80,10 @@ export function ComparePanel({
 
   if (data === null) {
     return (
-      <div className="panel">
-        <div className="panel-note">无法构建对比：快照缺少收银仿真基线（到达率/服务率/通道数）。请先补采对应信号。</div>
-      </div>
+      <section className="yh-review" aria-label="方案对比">
+        <ReviewHeading icon="compare" title="方案对比" description="同一模拟条件下比较收银方案" />
+        <ReviewNotice tone="warning">无法构建对比：快照缺少收银仿真基线（到达率/服务率/通道数）。请先补采对应信号。</ReviewNotice>
+      </section>
     );
   }
 
@@ -133,44 +134,43 @@ export function ComparePanel({
   };
 
   return (
-    <div className="panel">
-      <div className="panel-note">{data.note}</div>
-      <div className="scenario-cards">
-        {data.scenarios.map((s) => (
-          <div key={s.name} className={`scenario-card ${s.ok ? '' : 'scenario-rejected'}`}>
-            <div className="scenario-title">{s.name}</div>
+    <section className="yh-review" aria-label="方案对比">
+      <ReviewHeading icon="compare" title="方案对比" description="同一模拟条件下比较收银方案" detail={`种子 ${data.seed}`} />
+      <ReviewNotice>{data.note}</ReviewNotice>
+      {data.scenarios.map((s) => (
+        <article key={s.name} className="yh-review-card">
+          <div className="yh-review-card-body">
+            <div className="yh-review-card-title">
+              <h4>{s.name}</h4>
+              <span className="yh-review-tag" data-tone={s.ok ? 'approved' : 'critical'}>{s.ok ? '模拟结果' : '约束拒绝'}</span>
+            </div>
             {s.ok ? (
               <>
-                <StatLine label="平均排队" stat={s.avgWaitMin} unit="分钟" />
-                <StatLine label="P95 排队" stat={s.p95WaitMin} unit="分钟" />
-                <StatLine label="最大积压" stat={s.maxBacklog} unit="人" />
-                <div>
-                  调人工时：<strong>{s.extraStaffHours ?? 0}</strong> 小时
-                  {s.extraCostCny !== null && s.extraCostCny !== undefined ? (
-                    <>
-                      ｜成本：<strong>{s.extraCostCny}</strong> 元（合成教学时薪）
-                    </>
-                  ) : (
-                    <span className="muted">｜成本未核算（未提供时薪假设）</span>
-                  )}
+                <div className="yh-review-stats">
+                  <StatLine label="平均排队" stat={s.avgWaitMin} unit="分钟" />
+                  <StatLine label="P95 排队" stat={s.p95WaitMin} unit="分钟" />
+                  <StatLine label="最大积压" stat={s.maxBacklog} unit="人" />
                 </div>
-                <div>改动次数：{s.laneChangeCount ?? 0}</div>
-                {s.name.startsWith('C') && (
-                  <button className="primary" onClick={proposeC}>
-                    送店长审批
-                  </button>
-                )}
+                <dl className="yh-review-kv">
+                  <dt>调人工时</dt><dd>{s.extraStaffHours ?? 0} 小时</dd>
+                  <dt>成本</dt><dd>{s.extraCostCny == null ? '未核算（未提供时薪假设）' : `${s.extraCostCny} 元（合成教学时薪）`}</dd>
+                  <dt>改动次数</dt><dd>{s.laneChangeCount ?? 0}</dd>
+                </dl>
               </>
-            ) : (
-              <div className="muted">被约束拒绝：{s.why}</div>
-            )}
+            ) : <ReviewNotice tone="warning">被约束拒绝：{s.why}</ReviewNotice>}
           </div>
-        ))}
-      </div>
-      <div className="panel-note">
+          {s.ok && s.name.startsWith('C') && (
+            <footer className="yh-review-card-footer">
+              <span>创建草案，不会自动批准</span>
+              <BeautifulButton type="button" variant="primary" size="sm" onClick={proposeC}>送店长审批</BeautifulButton>
+            </footer>
+          )}
+        </article>
+      ))}
+      <ReviewNotice>
         假设披露：共享 FIFO 队列 + 指数服务时间（M/M/c 近似）；30 分钟窗口、5 次复制取均值；结果全部为<strong>模拟情景</strong>，不是真实门店预测。
-      </div>
-      {message !== null && <div className={message.kind === 'ok' ? 'ok-box' : 'alert-box'}>{message.text}</div>}
-    </div>
+      </ReviewNotice>
+      {message !== null && <ReviewNotice tone={message.kind === 'ok' ? 'success' : 'danger'}>{message.text}</ReviewNotice>}
+    </section>
   );
 }

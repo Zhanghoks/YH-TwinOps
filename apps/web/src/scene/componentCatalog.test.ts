@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
 import { COMPONENT_SAMPLES, buildComponentSample } from './componentCatalog';
 import { buildShelfPlanogram, buildFixtureDetail } from './detailGeometry';
-it('isolates eighteen reference design samples with bounded independent geometry', () => {
-  expect(COMPONENT_SAMPLES).toHaveLength(18);
-  for (const entry of COMPONENT_SAMPLES) {
+it('preserves eighteen legacy samples alongside eight independent dimensioned assets', () => {
+  expect(COMPONENT_SAMPLES).toHaveLength(26);
+  for (const entry of COMPONENT_SAMPLES.filter(s=>!s.id.startsWith('dimensioned-') && !s.id.startsWith('refrigeration-') && !s.id.startsWith('retail-'))) {
     const f = buildComponentSample(entry.id);
     expect(f.fixtureId.startsWith('design-sample-')).toBe(true);
     const parts = buildFixtureDetail(f);
@@ -46,4 +46,19 @@ it('stocks at least six facings per compact themed shelf and uses an opaque POS 
     expect(slots.filter(p=>p.level===0&&p.side===1)).toHaveLength(6);
   }
   expect(buildFixtureDetail(buildComponentSample('checkout')).find(p=>p.id==='pos-screen')?.material).toBe('label');
+});
+
+it('registers measured-envelope empty assets without replacing the legacy shelf samples',()=>{
+ const wall=buildComponentSample('dimensioned-wall'), island=buildComponentSample('dimensioned-gondola');
+ expect([wall.widthM,wall.depthM,wall.heightM]).toEqual([2.4,.47,2.2]);
+ expect([island.widthM,island.depthM,island.heightM]).toEqual([2.4,1,1.6]);
+ expect(wall.zoneId).toBe('design-only');
+ expect(island.zoneId).toBe('design-only');
+ expect(buildComponentSample('grocery').widthM).toBe(1.2);
+});
+
+it('registers three empty cold fixtures with manufacturer-reference external envelopes only',()=>{
+ for(const [id,size] of [['refrigeration-island',[2.502,.853,.833]],['refrigeration-upright',[1.35,.908,2.035]],['refrigeration-open',[2.58,.915,2.09]]] as const){
+ const f=buildComponentSample(id);expect([f.widthM,f.depthM,f.heightM]).toEqual(size);expect(f.zoneId).toBe('design-only');
+ }
 });

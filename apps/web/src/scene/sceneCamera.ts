@@ -1,5 +1,10 @@
-export type CameraView = 'overview' | 'top' | 'entrance' | 'site' | 'sky' | 'urbanInterior';
+export type CameraView = 'overview' | 'top' | 'entrance' | 'site' | 'sky' | 'urbanInterior' | 'f032' | 'F029' | 'F050' | 'F077' | 'F107' | 'F074' | 'F007' | 'F120';
 export function buildSceneCamera(view: CameraView, center: readonly [number, number], depth: number, width = 80): { position: [number, number, number]; target: [number, number, number] } {
+  const pilots:Record<string,readonly[number,number]>={F029:[-59,8],F050:[-17,-29.6],F077:[-20,-10.8],F107:[37,-3],F074:[52,-28],F007:[-34,-29],F120:[-1.25,39.75]};
+  const p=pilots[view];
+  if(p && view==='F007')return {position:[p[0]+12,9,p[1]+16],target:[p[0],.7,p[1]]};
+  if(p)return {position:[p[0]+8,7,p[1]+11],target:[p[0],.8,p[1]]};
+  if (view === 'f032') return {position:[17,6.5,36],target:[9,.8,26.25]};
   const [x, z] = center;
   const scale = Math.max(depth / 50, width / 80);
   if (view === 'urbanInterior') return {position:[x-17,15,z+depth/2+57],target:[x-24,1.4,z+depth/2+79]};

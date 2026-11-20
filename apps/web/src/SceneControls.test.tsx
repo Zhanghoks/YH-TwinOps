@@ -1,6 +1,6 @@
 import { buildLiveOperatingScenario } from './operatingClock';
 import { buildOperatingScenario } from './operatingModel';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createAgent } from '@ui-sdk/react/agent';
@@ -12,11 +12,68 @@ vi.mock('./ui/AgentShell', () => ({ AgentShell: () => <div>Agent workspace</div>
 vi.mock('./api', () => ({ createApprovalsClient: vi.fn(async () => null), fetchAgentStatus: vi.fn(async () => null) }));
 
 describe('scene presentation controls', () => {
+  it('keeps scene settings collapsed by default and restores focus on Escape', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ok:true,json:async()=>({assets:[]})})));
+    vi.stubGlobal('matchMedia', vi.fn(()=>({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()})));
+    render(<App/>);
+    const user = userEvent.setup();
+    const disclosure = screen.getByText('场景设置');
+    expect(disclosure.closest('details')?.open).toBe(false);
+    await user.click(disclosure);
+    expect(disclosure.closest('details')?.open).toBe(true);
+    const pause = screen.getByRole('button',{name:'暂停车流'});
+    pause.focus();
+    // jsdom does not consistently promote native summary to document.activeElement.
+    const restoreFocus = vi.spyOn(disclosure, 'focus');
+    await user.keyboard('{Escape}');
+    expect(disclosure.closest('details')?.open).toBe(false);
+    expect(restoreFocus).toHaveBeenCalledOnce();
+    restoreFocus.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps fixed-size fill in the original full-store scene without changing the saved trial switch or business snapshot', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ok:true,json:async()=>({assets:[]})})));
+    vi.stubGlobal('matchMedia',vi.fn(()=>({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()})));
+    render(<App/>);
+    fireEvent.click(screen.getByText("场景设置"));
+    const state=()=>JSON.parse(screen.getByTestId('scene-state').textContent??'{}');
+    fireEvent.click(screen.getByRole('radio',{name:'空货架'}));
+    const start=state();
+    const apply=(scope:'cell'|'fixture'='cell')=>{
+      fireEvent.click(screen.getByRole('radio',{name:'商品目录'}));
+      fireEvent.change(screen.getByRole('searchbox',{name:'搜索商品'}),{target:{value:'饼干'}});
+      fireEvent.change(screen.getByRole('combobox',{name:'铺满范围'}),{target:{value:scope}});
+      fireEvent.click(screen.getByRole('button',{name:'应用到 F077 并查看'}));
+    };
+    apply('fixture');
+    const request=state().fillRequest;
+    expect(request).toMatchObject({sku:'YH-DEMO-004',scope:'fixture'});
+    expect(state().pilotTrials).toEqual(['F077']);
+    expect(state().cameraView).toBe('F077');expect(state().mode).toBe('detail');expect(state().stocked).toBe(false);
+    expect(state().snapshot).toEqual(start.snapshot);expect(state().layout).toEqual(start.layout);
+    for(const [label,view] of [['全店视角','overview'],['俯视布局','top']] as const){
+      const revision=state().cameraRevision;
+      fireEvent.click(screen.getByRole('button',{name:label}));
+      expect(state()).toMatchObject({active:true,cameraView:view,mode:'detail',cameraRevision:revision+1,fillRequest:request,pilotTrials:['F077']});
+      expect(state().layout).toEqual(start.layout);expect(state().snapshot).toEqual(start.snapshot);
+      expect(state().componentId).toBeUndefined();
+    }
+    fireEvent.click(screen.getByRole('button',{name:'撤回 F077 填充（还原此前试换开关）'}));
+    expect(state().fillRequest).toBeUndefined();expect(state().pilotTrials).toEqual([]);
+    fireEvent.click(screen.getByRole('button',{name:'试换 F077 食品'}));
+    apply();
+    fireEvent.click(screen.getByRole('button',{name:'撤回 F077 填充（还原此前试换开关）'}));
+    expect(state().pilotTrials).toEqual(['F077']);expect(state().snapshot).toEqual(start.snapshot);
+    vi.unstubAllGlobals();
+  });
+
   it('keeps model mode separate from signals, supports reversible camera/label controls', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ assets: [{ assetId: 'baseline', status: 'approved', file: 'baseline.glb', role: 'store-shell' }] }) })));
     vi.stubGlobal('matchMedia',vi.fn(()=>({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()})));
     const user = userEvent.setup();
     render(<App />);
+    await user.click(screen.getByText("场景设置"));
     const state = () => JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}') as { mode: string; cameraView: string; cameraRevision: number; showLabels: boolean };
     expect(state().mode).toBe('detail');
     const entry = JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}');
@@ -24,35 +81,67 @@ describe('scene presentation controls', () => {
     expect(entry.referenceRegions.length).toBeGreaterThan(0);
     expect(entry.weather).toBe('sunny');
     expect(entry.stocked).toBe(true);
+    expect(entry.f032Trial).toBe(false);
+    await user.click(screen.getByRole('button',{name:'试换 F032 新架'}));
+    let trial=JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}');
+    expect(trial.f032Trial).toBe(true);
+    expect(trial.mode).toBe('detail');
+    expect(trial.cameraView).toBe('f032');
+    expect(trial.layout).toEqual(entry.layout);
+    expect(trial.snapshot).toEqual(entry.snapshot);
+    await user.click(screen.getByRole('radio',{name:'空货架'}));
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').f032Trial).toBe(true);
+    await user.click(screen.getByRole('radio',{name:'填充商品'}));
+    await user.click(screen.getByRole('button',{name:'回退 F032 原版'}));
+    trial=JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}');
+    expect(trial.f032Trial).toBe(false);
+    expect(trial.cameraView).toBe('f032');
+    expect(trial.layout).toEqual(entry.layout);
     await user.click(screen.getByRole('radio', {name:'空货架'}));
     expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').stocked).toBe(false);
     await user.click(screen.getByRole('radio', {name:'填充商品'}));
     expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').stocked).toBe(true);
     const sceneElement = screen.getByTestId('scene-state');
+    expect(screen.queryByRole('region',{name:'门店运营驾驶舱'})).toBeNull();
     await user.click(screen.getByRole('radio', { name: '经营看板' }));
+    expect(screen.getByRole('region',{name:'门店运营驾驶舱'})).toBeTruthy();
     expect(document.querySelector('.main.workspace-hidden')).toBeTruthy();
     expect(JSON.parse(sceneElement.textContent ?? '{}').active).toBe(false);
-    await user.click(screen.getByRole('radio', { name: '3D 工作台' }));
+    await user.click(screen.getByRole('radio', { name: '3D 孪生' }));
     expect(screen.getByTestId('scene-state')).toBe(sceneElement);
     expect(JSON.parse(sceneElement.textContent ?? '{}').active).toBe(true);
 
     expect(entry.cloudQuality).toBe('low');
     expect(entry.snapshot.atTime).toBe(buildLiveOperatingScenario(new Date('2026-11-13T10:30:00.000Z')).at);
     expect(Object.values(entry.operatingOccupancy).reduce((a,b)=>Number(a)+Number(b),0)).toBe(buildLiveOperatingScenario(new Date('2026-11-13T10:30:00.000Z')).current.occupancy);
+    await user.click(screen.getByRole('radio',{name:'经营看板'}));
     await user.click(screen.getByRole('radio',{name:'周末'}));
     let feed=JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}');
     expect(feed.snapshot.atTime).toBe(buildOperatingScenario('weekend',18).at);
     await user.selectOptions(screen.getByRole('combobox',{name:'经营模拟时段'}),'10');
+    await user.click(screen.getByRole('radio', { name: '3D 孪生' }));
+    expect(screen.queryByRole('combobox',{name:'经营模拟时段'})).toBeNull();
     await user.click(screen.getByRole('radio', { name: '经营看板' }));
-    await user.click(screen.getByRole('radio', { name: '3D 工作台' }));
     expect((screen.getByRole('combobox',{name:'经营模拟时段'}) as HTMLSelectElement).value).toBe('10');
+    await user.click(screen.getByRole('radio', { name: '3D 孪生' }));
+    const beforeCatalog = state();
+    await user.click(screen.getByRole('radio', { name: '商品目录' }));
+    expect(screen.getByRole('heading', { name: '商品目录' })).toBeTruthy();
+    expect(screen.queryByRole('region',{name:'门店运营驾驶舱'})).toBeNull();
+    expect(screen.getByText(/596 个试换陈列位置/u)).toBeTruthy();
+    expect(JSON.parse(sceneElement.textContent ?? '{}').active).toBe(false);
+    await user.click(screen.getByRole('radio', { name: '3D 孪生' }));
+    expect(screen.getByTestId('scene-state')).toBe(sceneElement);
+    expect(state()).toEqual(beforeCatalog);
 
     feed=JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}');
     expect(feed.snapshot.atTime).toBe(buildOperatingScenario('weekend',10).at);
+    await user.click(screen.getByRole('radio', { name: '经营看板' }));
     await user.click(screen.getByRole('button',{name:'进入异常教学情景'}));
     expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').operatingOccupancy).toBeUndefined();
     await user.click(screen.getByRole('button',{name:'返回经营模拟'}));
     expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').snapshot.atTime).toBe(buildOperatingScenario('weekend',10).at);
+    await user.click(screen.getByRole('radio', { name: '3D 孪生' }));
     expect(entry.showCustomers).toBe(true);
     await waitFor(()=>expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').customersPaused).toBe(true));
     await user.click(screen.getByRole('button', {name:'隐藏顾客'}));
@@ -78,10 +167,10 @@ describe('scene presentation controls', () => {
     await user.click(screen.getByRole('button', { name: '全店视角' }));
     await user.click(screen.getByRole('button', { name: '全店视角' }));
     expect(state().cameraView).toBe('overview');
-    expect(state().cameraRevision).toBe(4);
+    expect(state().cameraRevision).toBe(6);
     await user.click(screen.getByRole('button', { name: '入口视角' }));
     expect(state().cameraView).toBe('entrance');
-    expect(state().cameraRevision).toBe(5);
+    expect(state().cameraRevision).toBe(7);
     await user.click(screen.getByRole('button', { name: '隐藏分区' }));
     expect(state().showLabels).toBe(false);
     await user.click(screen.getByRole('button', { name: '显示分区' }));
@@ -116,7 +205,29 @@ describe('scene presentation controls', () => {
     await user.click(screen.getByRole('button', { name: '18 装卸收货月台' }));
     expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').componentId).toBe('dock');
     expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').layout).toEqual(baseline);
+    await user.click(screen.getByRole('button', { name: '19 定尺靠墙空架' }));
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').componentId).toBe('dimensioned-wall');
+    expect(screen.getByRole('radio',{name:'填充商品'}).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText(/挂点已预留/)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '20 定尺双面空架' }));
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').componentId).toBe('dimensioned-gondola');
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').layout).toEqual(baseline);
+    await user.click(screen.getByRole('button', { name: '21 滑盖冷冻岛柜' }));
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').componentId).toBe('refrigeration-island');
+    expect(screen.getByText(/不表示冷量仿真/)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '22 玻璃门冷冻柜' }));
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').componentId).toBe('refrigeration-upright');
+    await user.click(screen.getByRole('button', { name: '23 多层冷藏风幕柜' }));
+    for (const [name,id] of [['24 双面果蔬空台','retail-produce'],['25 鲜食玻璃服务柜','retail-service'],['26 人工收银工作台','retail-checkout']]) {
+      await user.click(screen.getByRole('button', {name}));
+      expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').componentId).toBe(id);
+      expect(screen.getByRole('radio',{name:'填充商品'}).hasAttribute('disabled')).toBe(true);
+    }
+    expect(screen.getByText(/护边、内部结构和终端高度/)).toBeTruthy();
+    expect(screen.getByRole('radio',{name:'填充商品'}).hasAttribute('disabled')).toBe(true);
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').layout).toEqual(baseline);
     await user.click(screen.getByRole('button', { name: '返回门店' }));
+    expect(screen.getByRole('radio',{name:'填充商品'}).hasAttribute('disabled')).toBe(false);
     expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').componentId).toBeUndefined();
     await user.click(screen.getByRole('button', { name: '场景全景' }));
     expect(state().cameraView).toBe('site');
@@ -132,6 +243,23 @@ describe('scene presentation controls', () => {
     expect(screen.getByText('减少动态：静态雨效')).toBeTruthy();
     await user.click(screen.getByRole('button',{name:'暂停雨效'}));
     expect(screen.getByRole('button',{name:'恢复雨效'}).getAttribute('aria-pressed')).toBe('true');
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').layout).toEqual(baseline);
+    await user.click(screen.getByRole('button',{name:'布局检查'}));
+    await user.click(screen.getByRole('button',{name:'按图候选'}));
+    const densePilotStart=JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}');
+    for (const [id,label] of [['F029','果蔬'],['F050','岛柜'],['F077','食品'],['F107','日化'],['F074','风幕柜'],['F007','鲜肉柜'],['F120','收银']]) {
+      await user.click(screen.getByRole('button',{name:`试换 ${id} ${label}`}));
+      const enabled=JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}');
+      expect(enabled.pilotTrials).toContain(id);
+      expect(enabled.cameraView).toBe(id);
+      expect(enabled.mode).toBe('detail');
+      expect(enabled.layout).toEqual(densePilotStart.layout);
+      expect(enabled.snapshot).toEqual(densePilotStart.snapshot);
+    }
+    await user.click(screen.getByRole('button',{name:'回退 F077 食品'}));
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').pilotTrials).toEqual(['F029','F050','F107','F074','F007','F120']);
+    await user.click(screen.getByRole('button',{name:'原型基线'}));
+    expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').pilotTrials).toEqual([]);
     expect(JSON.parse(screen.getByTestId('scene-state').textContent ?? '{}').layout).toEqual(baseline);
     vi.unstubAllGlobals();
   });

@@ -2,7 +2,7 @@
  * 右侧统一 Agent 对话框壳：选中上下文 + 工具页签 + 对话/告警/方案/审批 + 状态栏。
  * 整栏作为助手工作区；告警/方案/审批是对话框内工具视图，不是并列独立侧栏。
  */
-import { Separator } from '@ui-sdk/react/separator';
+import { Bot, MessagesSquare, Bell, GitCompareArrows, ShieldCheck } from 'lucide-react';
 import { Tabs, TabsIndicator, TabsList, TabsPanel, TabsTab } from '@ui-sdk/react/tabs';
 import type { AgentTools } from '@yh/agent/tools';
 import type { StoreLayout, TwinSignal, TwinSnapshot } from '@yh/contracts';
@@ -15,11 +15,11 @@ import { ApprovalsPanel } from './ApprovalsPanel';
 
 export type AgentView = 'agent' | 'alerts' | 'compare' | 'approvals';
 
-const VIEWS: { key: AgentView; label: string }[] = [
-  { key: 'agent', label: '门店助手' },
-  { key: 'alerts', label: '告警中心' },
-  { key: 'compare', label: '方案对比' },
-  { key: 'approvals', label: '审批' },
+const VIEWS: { key: AgentView; label: string; icon: typeof Bot }[] = [
+  { key: 'agent', label: '门店助手', icon: MessagesSquare },
+  { key: 'alerts', label: '告警中心', icon: Bell },
+  { key: 'compare', label: '方案对比', icon: GitCompareArrows },
+  { key: 'approvals', label: '审批', icon: ShieldCheck },
 ];
 
 export interface AgentShellProps {
@@ -56,17 +56,8 @@ export function AgentShell({
   return (
     <aside className="agent-shell" aria-label="门店运营 Agent 对话框">
       <header className="agent-shell-head">
-        <div>
-          <h2 className="agent-shell-title">门店运营 Agent</h2>
-          <p className="panel-note">对话诊断 · 告警证据 · 方案仿真 · 人审沙盒（合成教学，非永辉官方）</p>
-        </div>
+        <div className="ba-shell-identity"><span className="ba-shell-mark"><Bot size={19} strokeWidth={1.7} aria-hidden="true"/></span><div><p className="ba-shell-eyebrow">YH TWINOPS</p><h2 className="agent-shell-title">门店运营 Agent</h2></div><span className="ba-shell-demo">教学沙盒</span></div>
       </header>
-
-      <div className="agent-shell-context">
-        <SelectionInfo snapshot={snapshot} />
-      </div>
-
-      <Separator />
 
       <Tabs
         className="agent-tabs"
@@ -79,7 +70,7 @@ export function AgentShell({
           <TabsIndicator />
           {VIEWS.map((v) => (
             <TabsTab key={v.key} value={v.key}>
-              {v.label}
+              <v.icon size={14} aria-hidden="true"/><span>{v.label}</span>
               {v.key === 'alerts' && snapshot.alerts.length > 0 && (
                 <span className={`badge ${criticalCount > 0 ? 'badge-critical' : 'badge-warn'}`}>{snapshot.alerts.length}</span>
               )}
@@ -101,8 +92,8 @@ export function AgentShell({
       </Tabs>
 
       <footer className="statusbar">
-        信号 {snapshot.coverage.totalSignals} 条（合成 {snapshot.coverage.syntheticSignals}）· 快照 {snapshot.snapshotId} · 审批沙盒：
-        {client === null ? '连接中' : client.mode === 'api' ? 'API 已连接' : '本地降级'}
+        <details className="ba-scene-details"><summary>场景与数据 · {snapshot.coverage.totalSignals} 条信号</summary><div className="ba-scene-popover"><SelectionInfo snapshot={snapshot} /><p>合成信号 {snapshot.coverage.syntheticSignals} 条 · {at}</p><p>建议与推演，不直接执行门店操作</p></div></details>
+        <span title={`快照 ${snapshot.snapshotId}`}>审批沙盒：{client === null ? '连接中' : client.mode === 'api' ? 'API 已连接' : '本地降级'}</span>
       </footer>
     </aside>
   );

@@ -1,5 +1,6 @@
+import { Activity, ChevronDown, Clock3 } from 'lucide-react';
 import { useId, useState } from 'react';
-import { Button } from '@ui-sdk/react/button';
+import { BeautifulButton as Button } from './beautiful/Button';
 import { SegmentedControl, SegmentedControlItem } from '@ui-sdk/react/segmented-control';
 import type { LiveOperatingScenario } from '../operatingClock';
 import type { OperatingScenario } from '../operatingModel';
@@ -36,14 +37,15 @@ export function OperationsDashboard({
   return <section className="ops-dashboard" aria-labelledby={headingId}>
     <header className="ops-header">
       <div className="ops-heading">
+        <span className="ops-heading-icon" aria-hidden="true"><Activity size={15}/></span>
         <h2 id={headingId}>门店运营驾驶舱</h2>
         <span className="ops-chip">合成模拟 · 非真实监测</span>
         {!incidentMode && <span className="ops-source">{scenario.date} · 北京时间（UTC+8）</span>}
       </div>
       <div className="ops-controls">
         {!incidentMode && <>
-          <span className="ops-clock-status" role="status">{followClock && live ? `${String(Math.floor(live.minuteOfDay / 60)).padStart(2,'0')}:${String(live.minuteOfDay % 60).padStart(2,'0')} 随钟模拟 · ${live.status === 'preopen' ? '营业前' : live.status === 'closed' ? '已闭店' : '营业中'}` : '手动回看 · 完整小时情景'}</span>
-          {onResumeClock && !followClock && <Button onClick={onResumeClock}>返回随钟模拟</Button>}
+          <span className="ops-clock-status" role="status"><Clock3 size={12} aria-hidden="true"/>{followClock && live ? `${String(Math.floor(live.minuteOfDay / 60)).padStart(2,'0')}:${String(live.minuteOfDay % 60).padStart(2,'0')} 随钟模拟 · ${live.status === 'preopen' ? '营业前' : live.status === 'closed' ? '已闭店' : '营业中'}` : '手动回看 · 完整小时情景'}</span>
+          {onResumeClock && !followClock && <Button size="xs" variant="ghost" onClick={onResumeClock}>返回随钟模拟</Button>}
           <SegmentedControl aria-label="模拟日期类型" value={scenario.day} onValueChange={value => {
             if (value === 'weekday' || value === 'weekend') onDayChange(value);
           }}>
@@ -53,11 +55,11 @@ export function OperationsDashboard({
           <label>时段 <select aria-label="经营模拟时段" value={scenario.hour} onChange={e => onHourChange(Number(e.currentTarget.value))}>
             {scenario.series.map(row => <option key={row.hour} value={row.hour}>{hourLabel(row.hour)}–{hourLabel(row.hour + 1)}</option>)}
           </select></label>
-          <Button aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(open => !open)}>
-            {expanded ? '收起经营明细' : '展开经营明细'}
+          <Button size="xs" aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(open => !open)}>
+            {expanded ? '收起经营明细' : '展开经营明细'} <ChevronDown size={12} aria-hidden="true"/>
           </Button>
         </>}
-        <Button onClick={switchMode}>{incidentMode ? '返回经营模拟' : '进入异常教学情景'}</Button>
+        <Button size="xs" variant={incidentMode ? "primary" : "quiet"} onClick={switchMode}>{incidentMode ? '返回经营模拟' : '进入异常教学情景'}</Button>
       </div>
     </header>
     {incidentMode

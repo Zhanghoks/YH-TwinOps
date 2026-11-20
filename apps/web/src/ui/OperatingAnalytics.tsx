@@ -1,10 +1,11 @@
+import type { ReactNode } from 'react';
 import { useId, useState } from 'react';
 import { SegmentedControl, SegmentedControlIndicator, SegmentedControlItem } from '@ui-sdk/react/segmented-control';
 import { buildOperatingScenario, type OperatingHour, type OperatingScenario } from '../operatingModel';
 import type { LiveOperatingScenario } from '../operatingClock';
 import './OperatingAnalytics.css';
 
-type Props = { scenario: OperatingScenario; onHourChange: (hour: number) => void };
+type Props = { scenario: OperatingScenario; onHourChange: (hour: number) => void; controls?: ReactNode };
 const isLive = (scenario: OperatingScenario): scenario is LiveOperatingScenario =>
   'mode' in scenario && scenario.mode === 'live';
 type Metric = 'entrants' | 'transactions' | 'revenueCents';
@@ -123,7 +124,7 @@ function percentage(value: number, reference: number) {
   return (delta > 0 ? '+' : '') + delta.toFixed(1) + '%';
 }
 
-export function OperatingAnalytics({ scenario, onHourChange }: Props) {
+export function OperatingAnalytics({ scenario, onHourChange, controls }: Props) {
   const [rankBy, setRankBy] = useState<'occupancy' | 'revenueCents'>('occupancy');
   const [showAll, setShowAll] = useState(false);
   const title = useId();
@@ -165,6 +166,7 @@ export function OperatingAnalytics({ scenario, onHourChange }: Props) {
           <span>{scenario.date} · 北京时间（UTC+8）</span>
           <span>{live ? `跟随时间 · ${dataTime} · ${statusLabel}` : `手动整点情景 · ${span(scenario.hour)}`}</span></div>
       </header>
+      {controls && <div className="an-operating-controls">{controls}</div>}
       <section className="an-brief" aria-label="本时段优先关注">
         <div><p className="an-kicker">值班提示 · {detailLabel}</p>
           <h3>{live?.status === 'preopen' ? '尚未开店，未累计经营数据'

@@ -3,15 +3,12 @@ import './AgentPanel.css';
  * 侧边栏统一门店助手对话框：对话流 + 预设提问 + 证据折叠。
  * 优先走 /api/agent（服务端 pi / 本地规则）；API 不可达时降级浏览器内规则解释器。
  */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@ui-sdk/react/button';
-import { ArrowUp, ArrowUpRight, Bot, ChartNoAxesCombined, Database, ListChecks, ShieldCheck, Users, Waypoints } from 'lucide-react';
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from '@ui-sdk/react/collapsible';
-import { Field, FieldDescription, FieldLabel } from '@ui-sdk/react/field';
+import { Bot, ChartNoAxesCombined, Database, ListChecks, ShieldCheck, Users } from 'lucide-react';
+import ContextCards from './beautiful-agent/ContextCards';
+import ThinkingState from './beautiful-agent/ThinkingState';
+import PromptBar from './beautiful-agent/PromptBar';
 import {
   ScrollArea,
   ScrollAreaContent,
@@ -20,7 +17,6 @@ import {
   ScrollAreaThumb,
   ScrollAreaViewport,
 } from '@ui-sdk/react/scroll-area';
-import { Textarea } from '@ui-sdk/react/textarea';
 import type { AgentEvidence, AgentTools } from '@yh/agent/tools';
 import { answerLocally, type AgentAnswer } from '@yh/agent/rules';
 import type { StoreLayout, TwinSignal } from '@yh/contracts';
@@ -49,17 +45,11 @@ interface ChatTurn {
 
 function EvidenceList({ evidence }: { evidence: AgentEvidence[] }) {
   if (evidence.length === 0) return <p className="muted">（本回答无证据引用）</p>;
-  return (
-    <ul className="evidence-list">
-      {evidence.map((e, i) => (
-        <li key={`${e.signalId}-${i}`} className="evidence-chip">
-          <div className="evidence-card-title"><code>{e.signalId}</code><span>{e.synthetic ? '合成信号' : e.kind}</span></div>
-          <strong>{e.metric}</strong>
-          <dl><div><dt>来源</dt><dd>{e.sourceId}</dd></div><div><dt>时间</dt><dd>{e.observedAt}</dd></div><div><dt>置信</dt><dd>{e.confidence ?? '—'}</dd></div></dl>
-        </li>
-      ))}
-    </ul>
-  );
+  return <ContextCards labels={{header:'依据来源',count:String(evidence.length)}} chunks={evidence.map((e,i)=>({
+    id:`${e.signalId}-${i}`,title:e.metric,chars:e.synthetic?'合成信号':e.kind,source:e.sourceId,badge:e.synthetic?'S':'D',
+    body:<><code className="ba-signal-id">{e.signalId}</code><dl className="ba-evidence-fields"><div><dt>来源</dt><dd>{e.sourceId}</dd></div><div><dt>时间</dt><dd>{e.observedAt}</dd></div><div><dt>置信</dt><dd>{e.confidence??'—'}</dd></div><div><dt>类型</dt><dd>{e.kind}</dd></div></dl></>,
+  }))}/>;
+
 }
 
 function AssistantBubble({ turn }: { turn: ChatTurn }) {
@@ -79,19 +69,10 @@ function AssistantBubble({ turn }: { turn: ChatTurn }) {
         </div>
       )}
       {answer !== undefined && (
-        <Collapsible className="agent-collapsible" defaultOpen={false}>
-          <CollapsibleTrigger aria-label="展开证据与工具轨迹">
-            <Waypoints size={14} aria-hidden="true" />证据 {answer.evidence.length} 条 · 工具轨迹
-            {answer.mode === 'pi-llm' ? ` · ${answer.model}` : ' · 本地规则'}
-          </CollapsibleTrigger>
-          <CollapsiblePanel>
-            <p className="tool-calls">
-              工具调用：
-              {answer.toolCalls.length === 0 ? '无' : answer.toolCalls.map((c) => c.tool).join('、')}
-            </p>
-            <EvidenceList evidence={answer.evidence} />
-          </CollapsiblePanel>
-        </Collapsible>
+        <ThinkingState working={false} rows={answer.toolCalls.map((call,index)=>({id:`${call.tool}-${index}`,primary:call.tool,secondary:JSON.stringify(call.args,null,2)}))}>
+          <p className="ba-engine-record">{answer.mode==='pi-llm'?`模型 · ${answer.model}`:'回答引擎 · 本地规则'}</p>
+          <EvidenceList evidence={answer.evidence}/>
+        </ThinkingState>
       )}
     </article>
   );
@@ -105,7 +86,8 @@ export interface AgentPanelProps {
 }
 
 export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): React.JSX.Element {
-  const formId = useId();
+  const requestCounter = useRef(0);
+  const requestPending = useRef(false);
   const [question, setQuestion] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [status, setStatus] = useState<AgentEngineStatus | null>(null);
@@ -137,9 +119,11 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
 
   const ask = async (raw: string): Promise<void> => {
     const q = raw.trim();
-    if (q.length === 0 || busy) return;
-    const userId = `u-${Date.now()}`;
-    const assistantId = `a-${Date.now()}`;
+    if (q.length === 0 || requestPending.current) return;
+    requestPending.current=true;
+    const requestId=++requestCounter.current;
+    const userId = `u-${requestId}`;
+    const assistantId = `a-${requestId}`;
     setQuestion('');
     setTurns((prev) => [
       ...prev,
@@ -163,6 +147,7 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
       setTransport('local');
     }
 
+    requestPending.current=false;
     setTurns((prev) =>
       prev.map((t) =>
         t.id === assistantId
@@ -182,19 +167,20 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
         : '浏览器本地规则（离线）';
 
   return (
-    <section className="agent-dialog agent-workspace" aria-label="门店助手对话框">
-      <header className="agent-dialog-head agent-dialog-head-embedded">
-        <div className="agent-context-row"><span className="agent-data-badge">合成教学数据</span><span className="agent-engine-chip" title={status?.note}>{engineLabel}</span></div>
-        <p className="agent-scope-note"><ShieldCheck size={13} aria-hidden="true" />建议与推演，不直接执行门店操作</p>
-        <p className="agent-snapshot-time">场景时间 · {at.replace('T',' ').replace('Z',' UTC')}</p>
-      </header>
+    <section className={`agent-dialog agent-workspace ${turns.length===0?'ba-home':'ba-conversation'}`} aria-label="门店助手对话框">
+      <div className="ba-session-strip">
+        <span className="agent-data-badge">合成教学数据</span>
+        <details className="ba-session-details"><summary>{engineLabel}</summary><div className="ba-session-popover"><p>{status?.note}</p><p><ShieldCheck size={12} aria-hidden="true"/>建议与推演，不直接执行门店操作</p><p>场景时间 · {at}</p></div></details>
+      </div>
 
       <ScrollArea className="agent-transcript" stickToEnd>
         <ScrollAreaViewport role="log" aria-label="对话记录" tabIndex={0}>
           <ScrollAreaContent>
             {turns.length === 0 ? (
               <div className="chat-empty">
-                <div className="agent-empty-heading"><div className="agent-avatar"><Bot size={22} strokeWidth={1.6} aria-hidden="true" /></div><span className="agent-empty-eyebrow">门店运营 · COPILOT</span><h3>有什么需要一起看看？</h3><p>从现场信号中找线索，<br />让每个建议都有据可循。</p></div>
+                <div className="agent-empty-heading"><span className="agent-empty-eyebrow">你好，店长</span><h3>今天有什么可以帮你？</h3></div>
+                <PromptBar value={question} onChange={setQuestion} onSend={()=>{void ask(question);}} busy={busy}/>
+                <p className="ba-suggestion-label">从一个问题开始</p>
                 <div className="preset-row" role="group" aria-label="预设提问">
                   {PRESETS.map((p) => (
                     <Button
@@ -205,7 +191,7 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
                         void ask(p.question);
                       }}
                     >
-                      <p.icon className="agent-preset-icon" size={18} strokeWidth={1.7} aria-hidden="true" /><span className="agent-preset-title">{p.title}<ArrowUpRight size={14} aria-hidden="true" /></span><span className="agent-preset-detail">{p.detail}</span>
+                      <p.icon className="agent-preset-icon" size={18} strokeWidth={1.7} aria-hidden="true" /><span className="agent-preset-title">{p.title}<span className="agent-preset-detail">{p.detail}</span></span>
                     </Button>
                   ))}
                 </div>
@@ -218,9 +204,7 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
                       {turn.text}
                     </div>
                   ) : turn.pending ? (
-                    <div key={turn.id} className="chat-bubble chat-bubble-assistant chat-pending" aria-busy="true" role="status">
-                      {turn.text}
-                    </div>
+                    <div key={turn.id} className="chat-bubble chat-bubble-assistant chat-pending" aria-busy="true"><ThinkingState working rows={[]}/></div>
                   ) : (
                     <AssistantBubble key={turn.id} turn={turn} />
                   ),
@@ -235,54 +219,7 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
         <ScrollAreaScrollToEnd aria-label="跳到最新消息">最新</ScrollAreaScrollToEnd>
       </ScrollArea>
 
-      {turns.length > 0 && (
-        <div className="preset-row preset-row-compact" role="group" aria-label="继续提问预设">
-          {PRESETS.map((p) => (
-            <Button
-              key={p.title}
-              className="preset"
-              disabled={busy}
-              onClick={() => {
-                void ask(p.question);
-              }}
-            >
-              {p.title}
-            </Button>
-          ))}
-        </div>
-      )}
-
-      <form
-        id={formId}
-        className="agent-composer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void ask(question);
-        }}
-      >
-        <Field name="agent-question" className="agent-field">
-          <FieldLabel>向门店助手提问</FieldLabel>
-          <Textarea
-            className="agent-input"
-            value={question}
-            autoResize
-            rows={2}
-            placeholder="例如：现在先处理什么？为什么？"
-            disabled={busy}
-            onValueChange={(value) => setQuestion(value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                void ask(question);
-              }
-            }}
-          />
-          <FieldDescription>Enter 发送 · Shift+Enter 换行</FieldDescription>
-        </Field>
-        <Button type="submit" className="primary" disabled={busy || question.trim().length === 0} pendingAnnouncement="正在提问" aria-label="提问">
-          <ArrowUp size={17} aria-hidden="true" />提问
-        </Button>
-      </form>
+      {turns.length > 0 && <div className="ba-composer-dock"><PromptBar value={question} onChange={setQuestion} onSend={()=>{void ask(question);}} busy={busy}/></div>}
     </section>
   );
 }
