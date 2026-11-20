@@ -92,6 +92,15 @@ describe('门店助手 API（pi 接入缝：默认本地规则）', () => {
     expect(status.engine).toBe('rules-local');
   });
 
+  it('POST /api/agent/ask 非法上下文明确 400，不进入模型', async()=>{
+    await start();
+    for(const patch of [{merchandising:{products:{},placements:[]}},{at:'not-a-date'},{signals:{}},{question:'x'.repeat(4001)},{merchandising:{products:[],placements:[],validSlotIdsByFixture:{F077:['forged']}}}]) {
+      const response=await fetch(`${base}/api/agent/ask`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:'F077 上有什么？',at:'2026-11-15T18:00:00Z',layout:makeTestLayout(),signals:[],...patch})});
+      expect(response.status).toBe(400);
+      expect(await response.json()).toHaveProperty('error');
+    }
+  });
+
   it('pi 失败时 502 不回传凭证或上游错误原文', async () => {
     await start({
       YH_AGENT_PROVIDER: 'no-such-provider',

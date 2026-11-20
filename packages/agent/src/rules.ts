@@ -1,5 +1,5 @@
 import { TEACHING_WAGE_CNY_PER_HOUR, type CheckoutScenario } from '@yh/simulation';
-import { DEFAULT_AGENT_SEED, type AgentEvidence, type AgentTools } from './tools';
+import { DEFAULT_AGENT_SEED, type AgentEvidence, type AgentToolResult, type AgentTools } from './tools';
 
 /**
  * 本地规则解释器：无 LLM Key / 断网时的默认路径（PRD §9.1，AGENTS.md 离线约束）。
@@ -44,12 +44,35 @@ export function answerLocally(question: string, tools: AgentTools): AgentAnswer 
   const track = (
     tool: string,
     args: Record<string, unknown>,
-    result: { status: string; message?: string; data: Record<string, unknown>; evidence: AgentEvidence[] },
+    result: AgentToolResult,
   ) => {
     toolCalls.push({ tool, args });
     evidence.push(...result.evidence);
     return result;
   };
+
+  // SKU and fixture routes precede generic stock/attention fallbacks.
+  const fixtureId=question.match(/\bF\d{3}\b/i)?.[0].toUpperCase();
+  const sku=(question.match(/\bYH-(?:LOCAL|DEMO)-[A-Z0-9_-]+\b/i)?.[0] ?? question.match(/\b[A-Z][A-Z0-9_-]*\d[A-Z0-9_-]*\b/gi)?.find(id=>!/^F\d{3}$/i.test(id)))?.toUpperCase();
+  const asksInventory=/(库存|缺货|补货|还有多少|inventory|stock)/i.test(question);
+  const asksProducts=fixtureId!==undefined && /(商品|陈列|放了|放着|有什么|上有什么|products)/i.test(question);
+  if (asksProducts || (sku!==undefined && asksInventory)) {
+    const lines:string[]=['【商品教学沙盒 · 合成数据】'];
+    const render=(result:ReturnType<AgentTools['get_fixture_products']>)=>{
+      const rows=result.data['displayLines'];
+      if(Array.isArray(rows))lines.push(...rows.filter((line):line is string=>typeof line==='string'));
+      if(result.message)lines.push(result.message);
+      if(result.status!=='OK')cannotJudge.push(result.message??'UNKNOWN：缺少可靠商品数据');
+    };
+    if(asksProducts && fixtureId!==undefined)render(track('get_fixture_products',{fixtureId},tools.get_fixture_products({fixtureId})));
+    if(sku!==undefined && asksInventory) {
+      const args=fixtureId===undefined?{sku}:{sku,fixtureId};
+      render(track('get_sku_inventory',args,tools.get_sku_inventory(args)));
+    }
+    lines.push('陈列位置数不是库存；不执行采购、入库、扣减或补货。');
+    if(evidence.length)lines.push(`证据：共 ${evidence.length} 条；展开「证据与工具轨迹」查看完整来源、货位 ID 与时间。`);
+    return {answer:lines.join('\n'),mode:'rules-local',toolCalls,evidence,cannotJudge};
+  }
 
   const wantsCompare = /(增开|多开|假设|如果|what.?if|仿真|三方案|方案对比|对比)/i.test(question);
   const wantsAttention = /(哪里|哪些|最需要|关注|处理|概况|全店|overview)/i.test(question);

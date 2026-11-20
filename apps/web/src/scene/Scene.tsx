@@ -1,3 +1,4 @@
+import type {ShelfSlotReplacement} from '../catalog/merchandisingAdapter';
 import type {SameSkuFillRequest} from './sameSkuFill';
 import { RetailFixturePreview } from './RetailFixturePreview';
 import { RefrigerationFixturePreview } from './RefrigerationFixturePreview';
@@ -356,7 +357,7 @@ function ZoneNode({
   );
 }
 
-export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, referenceRegions, componentId, weather = 'sunny', reducedMotion = false, cityPaused = false, cloudQuality = 'low', economy = true, showCustomers = true, customersPaused = false, operatingOccupancy, operatingOccupancyLabel = '平均在场估算', active = true, stocked = true, f032Trial = false, pilotTrials = [], fillRequest }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; referenceRegions?: ReferenceRegion[]; componentId?: ComponentSampleId; weather?: SimulatedWeather; reducedMotion?: boolean; cityPaused?: boolean; cloudQuality?: 'off'|'low'|'high'; economy?: boolean; showCustomers?: boolean; customersPaused?: boolean; operatingOccupancy?: Record<string,number>; operatingOccupancyLabel?: string; active?: boolean; stocked?: boolean; f032Trial?: boolean; pilotTrials?: readonly string[]; fillRequest?:SameSkuFillRequest }) {
+export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView = 'overview', cameraRevision = 0, showLabels = true, fixedCenter, referenceRegions, componentId, weather = 'sunny', reducedMotion = false, cityPaused = false, cloudQuality = 'low', economy = true, showCustomers = true, customersPaused = false, operatingOccupancy, operatingOccupancyLabel = '平均在场估算', active = true, stocked = true, f032Trial = false, pilotTrials = [], fillRequest, placementReplacement }: { snapshot: TwinSnapshot; layout: StoreLayout; manifest: AssetManifest; mode?: SceneMode; cameraView?: CameraView; cameraRevision?: number; showLabels?: boolean; fixedCenter?: readonly [number, number]; referenceRegions?: ReferenceRegion[]; componentId?: ComponentSampleId; weather?: SimulatedWeather; reducedMotion?: boolean; cityPaused?: boolean; cloudQuality?: 'off'|'low'|'high'; economy?: boolean; showCustomers?: boolean; customersPaused?: boolean; operatingOccupancy?: Record<string,number>; operatingOccupancyLabel?: string; active?: boolean; stocked?: boolean; f032Trial?: boolean; pilotTrials?: readonly string[]; fillRequest?:SameSkuFillRequest; placementReplacement?:ShelfSlotReplacement }) {
   const layer = useWorkbench((s) => s.layer);
   const selection = useWorkbench((s) => s.selection);
   const select = useWorkbench((s) => s.select);
@@ -434,7 +435,7 @@ export function Scene({ snapshot, layout, manifest, mode = 'detail', cameraView 
         {referenceRegions&&<DepartmentFloor regions={referenceRegions}/>}
         <StoreEnvelope layout={layout} center={groundCenter} reference={!!referenceRegions} />
         {showCustomers && <StoreCustomers layout={layout} decorations={referenceDisplays} paused={customersPaused} />}
-        <DetailedFixtures fillRequest={fillRequest} pilotTrials={pilotTrials} f032Trial={f032Trial} stocked={stocked} compactFaces={economy} fixtures={layout.fixtures} decorations={referenceDisplays} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
+        <DetailedFixtures placementReplacement={placementReplacement} fillRequest={fillRequest} pilotTrials={pilotTrials} f032Trial={f032Trial} stocked={stocked} compactFaces={economy} fixtures={layout.fixtures} decorations={referenceDisplays} selectedId={selection?.kind === 'fixture' ? selection.id : undefined} onSelect={(id) => select({ kind: 'fixture', id })} />
       </>}
       </>}
 

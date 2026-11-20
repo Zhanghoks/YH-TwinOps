@@ -1,10 +1,10 @@
+import {useMerchandisingDemo} from './catalog/useMerchandisingDemo';
 import {buildSameSkuFill,type SameSkuFillRequest} from './scene/sameSkuFill';
 import { useOperatingClock } from './useOperatingClock';
 import { buildLiveOperatingScenario, liveOperatingSignals } from './operatingClock';
 import { buildOperatingScenario, operatingSignals, type OperatingDay } from './operatingModel';
 import { OperatingAnalytics } from './ui/OperatingAnalytics';
 import { ProductCatalog, type TrialPlacementCounts } from './ui/ProductCatalog';
-import { buildProductPlacements } from './catalog/productPlacements';
 import { OperationsDashboard } from './ui/OperationsDashboard';
 import type { SimulatedWeather } from './scene/weatherModel';
 import { COMPONENT_SAMPLES, type ComponentSampleId } from './scene/componentCatalog';
@@ -22,6 +22,7 @@ import { generatePlanningLayout, buildReferenceDisplayFixtures } from './scene/p
 import { useWorkbench, type ViewLayer } from './state';
 import { createApprovalsClient, fetchAgentStatus, type ApprovalsClient } from './api';
 import { SceneBoundary } from './scene/SceneBoundary';
+import { ScenePlanFallback } from './scene/ScenePlanFallback';
 import { Scene, type SceneMode, type AssetManifest } from './scene/Scene';
 import { AgentShell, type AgentView } from './ui/AgentShell';
 import { BeautifulButton } from './ui/beautiful/Button';
@@ -84,13 +85,6 @@ export function App(): React.JSX.Element {
   const [operatingHour,setOperatingHour] = useState(18);
   const [incidentMode,setIncidentMode] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<'scene' | 'analytics' | 'products'>('scene');
-  const catalogTrialCounts = useMemo(() => {
-    if (workspaceView !== 'products') return undefined;
-    try { return buildProductPlacements().reduce<TrialPlacementCounts>((counts, {sku}) => {
-      counts[sku] = (counts[sku] ?? 0) + 1;
-      return counts;
-    }, {}); } catch { return undefined; }
-  }, [workspaceView]);
   const clock = useOperatingClock();
   const [followClock, setFollowClock] = useState(true);
   const liveOperating = useMemo(() => buildLiveOperatingScenario(clock), [clock]);
@@ -116,7 +110,6 @@ export function App(): React.JSX.Element {
   const [f032Trial,setF032Trial]=useState(false);
   const [pilotTrials,setPilotTrials]=useState<string[]>([]);
   const [fillRequest,setFillRequest]=useState<SameSkuFillRequest>();
-  const effectivePilotTrials=useMemo(()=>fillRequest&&!pilotTrials.includes('F077')?[...pilotTrials,'F077']:pilotTrials,[fillRequest,pilotTrials]);
   const [customersPaused,setCustomersPaused]=useState(false);
   const [economy,setEconomy]=useState(true);
   const [cloudQuality,setCloudQuality]=useState<'off'|'low'|'high'>('low');
@@ -135,25 +128,37 @@ export function App(): React.JSX.Element {
   const planningResult = useMemo(() => {
     try { return generatePlanningLayout(baselineLayout); } catch { return null; }
   }, []);
+  const layout = planning && planningResult ? planningResult.layout : baselineLayout;
+  const trial=useMerchandisingDemo(layout,scenarioAt,!!fillRequest,stocked);
+  const catalogTrialCounts=useMemo(()=>trial.merchandise?.placements.reduce<TrialPlacementCounts>((counts,{sku})=>{
+    counts[sku]=(counts[sku]??0)+1;return counts;
+  },Object.create(null) as TrialPlacementCounts),[trial.merchandise]);
+  const [selectedSlotId,setSelectedSlotId]=useState<string>();
+  const effectivePilotTrials=useMemo(()=>(fillRequest||trial.replacement)&&!pilotTrials.includes('F077')?[...pilotTrials,'F077']:pilotTrials,[fillRequest,trial.replacement,pilotTrials]);
+  const focusF077=()=>{
+    setSceneMode('detail');setComponentId(undefined);setWorkspaceView('scene');
+    setCameraView('F077');setCameraRevision(n=>n+1);select({kind:'fixture',id:'F077'});
+  };
+  const applyPlacement=(slotId:string,sku:string)=>{
+    if(trial.apply(slotId,sku)){setSelectedSlotId(slotId);focusF077();}
+  };
   const previewFill=useCallback((request:SameSkuFillRequest)=>{
+    if(trial.hasSavedOverride)return {count:0,skippedLevels:[],error:'请先撤回 F077 单货位试摆。'};
     const f=planningResult?.layout.fixtures.find(f=>f.fixtureId==='F077');
     if(!f)return {count:0,skippedLevels:[],error:'密集版 F077 不可用'};
     const plan=buildSameSkuFill(f,request);
     return {count:plan.counts.products,skippedLevels:plan.skipped.map(s=>`${s.mountKey}: ${s.reason}`),error:plan.incompatibility ?? undefined};
-  },[planningResult]);
+  },[planningResult,trial.hasSavedOverride]);
   const applyFill=(request:SameSkuFillRequest)=>{
     const preview=previewFill(request);if(preview.error||!preview.count)return;
-    setFillRequest({...request});setPlanning(true);setSceneMode('detail');setComponentId(undefined);
-    setWorkspaceView('scene');
-    setCameraView('F077');setCameraRevision(n=>n+1);select({kind:'fixture',id:'F077'});
+    setFillRequest({...request});setPlanning(true);setSelectedSlotId(undefined);focusF077();
   };
   const referenceDisplayCount = useMemo(() => planningResult ? buildReferenceDisplayFixtures(planningResult.layout).length : 0, [planningResult]);
-  const layout = planning && planningResult ? planningResult.layout : baselineLayout;
   const layoutAudit = useMemo(() => auditStoreLayout(layout), [layout]);
   const baselineAudit = useMemo(() => auditStoreLayout(baselineLayout), []);
   const reviewedGaps = [...layoutAudit.narrowGaps].sort((a, b) => a.gapM - b.gapM).slice(0, 5);
   const changePlan = (next: boolean): void => {
-    setPlanning(next); setSceneMode('detail'); setLayer('none'); select(null);
+    setPlanning(next); setSceneMode('detail'); setLayer('none'); select(null); setSelectedSlotId(undefined);
     setCameraView('top'); setCameraRevision((n) => n + 1);
   };
 
@@ -172,7 +177,7 @@ export function App(): React.JSX.Element {
   }, []);
 
   const snapshot = useMemo(() => projectTwinState(signals, layout, scenarioAt), [signals, layout, scenarioAt]);
-  const tools = useMemo(() => createAgentTools({ snapshot, signals }), [snapshot, signals]);
+  const tools = useMemo(() => createAgentTools({ snapshot, signals, merchandise:trial.merchandise }), [snapshot, signals, trial.merchandise]);
 
   return (
     <div className="workbench">
@@ -232,7 +237,12 @@ export function App(): React.JSX.Element {
                 followClock={followClock} onResumeClock={() => setFollowClock(true)} incidentMode={incidentMode} onIncidentModeChange={setIncidentMode} />} />}
       </main>
       <div className="analytics-view" hidden={workspaceView !== 'products'}>
-        <ProductCatalog trialCounts={catalogTrialCounts} fillRequest={fillRequest} previewFill={previewFill} onApplyFill={applyFill} onRevertFill={()=>setFillRequest(undefined)} />
+        {trial.status&&<p className="pc-feedback" role="status">{trial.status}</p>}
+        {planning&&trial.hasSavedOverride&&!trial.active&&<BeautifulButton onClick={trial.revert}>清除不兼容的本机试摆</BeautifulButton>}
+        <ProductCatalog catalogItems={trial.items} onCatalogSaved={trial.setItems}
+          placementTrial={{slots:trial.activeSlots,revision:`${planning}/${trial.active?.placementId??''}/${trial.active?.sku??''}`,enabled:!trial.blockReason,blockReason:trial.blockReason,active:trial.active,
+            onPreview:trial.preview,onApply:applyPlacement,onRevert:trial.revert}}
+          trialCounts={catalogTrialCounts} fillRequest={fillRequest} previewFill={previewFill} onApplyFill={applyFill} onRevertFill={()=>setFillRequest(undefined)} />
       </div>
       <Resizable className={`main${workspaceView !== 'scene' ? ' workspace-hidden' : ''}${modelFocused ? ' model-focused' : ''}`} autoSaveId="yh-workbench-split">
         <ResizablePanel id="yh-scene" className="scene-pane" defaultSize={68} minSize={42}>
@@ -269,7 +279,7 @@ export function App(): React.JSX.Element {
                 </section>}
                 {planning && <section className="weather-controls" aria-label="分类局部试换">
                   <strong>分类试换 · 每点独立回退</strong>
-                  {(['F029','F050','F077','F107','F074','F007','F120'] as const).map((id,i)=><BeautifulButton size="xs" key={id} disabled={id==='F077'&&!!fillRequest} aria-pressed={pilotTrials.includes(id)} onClick={()=>{setPilotTrials(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setSceneMode('detail');setCameraView(id);setCameraRevision(n=>n+1);}}>{pilotTrials.includes(id)?'回退':'试换'} {id} {['果蔬','岛柜','食品','日化','风幕柜','鲜肉柜','收银'][i]}</BeautifulButton>)}
+                  {(['F029','F050','F077','F107','F074','F007','F120'] as const).map((id,i)=><BeautifulButton size="xs" key={id} disabled={id==='F077'&&(!!fillRequest||!!trial.replacement)} aria-pressed={pilotTrials.includes(id)} onClick={()=>{setPilotTrials(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setSceneMode('detail');setCameraView(id);setCameraRevision(n=>n+1);}}>{pilotTrials.includes(id)?'回退':'试换'} {id} {['果蔬','岛柜','食品','日化','风幕柜','鲜肉柜','收银'][i]}</BeautifulButton>)}
                   {fillRequest&&<BeautifulButton size="xs" onClick={()=>setFillRequest(undefined)}>撤回 F077 填充（还原此前试换开关）</BeautifulButton>}
                   <span>{fillRequest ? 'F077 同款填充临时启用 · 不改变其他点位与库存' : pilotTrials.length ? `${pilotTrials.join(' / ')} 已开启（精细模型可见）· F107为2300mm参数变体；商品为合成模型` : '默认旧版 · 不影响其他点位与经营数据'}</span>
                 </section>}
@@ -326,16 +336,18 @@ export function App(): React.JSX.Element {
                 <BeautifulButton size="sm" variant="quiet" onClick={() => { setComponentId(undefined); setCameraView('sky'); setCameraRevision(n=>n+1); }}>城市天际线</BeautifulButton>
                 <BeautifulButton size="sm" variant="quiet" onClick={() => { setComponentId(undefined); setCameraView('urbanInterior'); setCameraRevision(n=>n+1); }}>街区内部</BeautifulButton>
               </div>
-              <div className="scene-mode-note">{componentId ? '独立设计样板 · 未批准 · 不计入布局与库存' : <>{planning && '按图候选 · 尺寸推定 · 未批准 · 数据非候选仿真 · '}{sceneMode === 'detail' ? `合成教学布局 ${layout.widthM}×${layout.depthM} m · 商品为装饰，不代表库存 · ${stocked ? "货架已填充" : "仅货架结构（其他柜台不变）"}` : sceneMode === 'shell' ? '已登记原始外壳 · 基线未修改' : '布局白膜 · 设施尺寸来自布局数据'}</>}</div>
+              <div className="scene-mode-note">{trial.active && (!stocked||sceneMode!=='detail'||!!componentId) && '单货位试摆当前不可见；回到精细模型并填充商品后显示。 · '}{componentId ? '独立设计样板 · 未批准 · 不计入布局与库存' : <>{planning && '按图候选 · 尺寸推定 · 未批准 · 数据非候选仿真 · '}{sceneMode === 'detail' ? `合成教学布局 ${layout.widthM}×${layout.depthM} m · 商品为装饰，不代表库存 · ${stocked ? "货架已填充" : "仅货架结构（其他柜台不变）"}` : sceneMode === 'shell' ? '已登记原始外壳 · 基线未修改' : '布局白膜 · 设施尺寸来自布局数据'}</>}</div>
             </div>
-            <SceneBoundary><Scene fillRequest={planning ? fillRequest : undefined} pilotTrials={planning ? effectivePilotTrials : []} f032Trial={planning && f032Trial} stocked={stocked} operatingOccupancyLabel={followClock ? '模拟在场估算' : '平均在场估算'} active={workspaceView === 'scene'} operatingOccupancy={operatingOccupancy} showCustomers={showCustomers} customersPaused={customersPaused || reducedMotion} economy={economy} cityPaused={cityPaused || reducedMotion} cloudQuality={cloudQuality} weather={weather} reducedMotion={reducedMotion || rainPaused} componentId={componentId} snapshot={snapshot} layout={layout} manifest={manifest} mode={sceneMode} cameraView={cameraView} cameraRevision={cameraRevision} showLabels={showLabels} fixedCenter={planning ? [0, 0] : undefined} referenceRegions={planning && planningResult ? planningResult.report.referenceRegions : undefined} /></SceneBoundary>
+            <SceneBoundary fallback={<ScenePlanFallback layout={layout} fixedCenter={planning ? [0, 0] : undefined} merchandising={trial.merchandise} />}><Scene placementReplacement={sceneMode==='detail'?trial.replacement:undefined} fillRequest={planning ? fillRequest : undefined} pilotTrials={planning ? effectivePilotTrials : []} f032Trial={planning && f032Trial} stocked={stocked} operatingOccupancyLabel={followClock ? '模拟在场估算' : '平均在场估算'} active={workspaceView === 'scene'} operatingOccupancy={operatingOccupancy} showCustomers={showCustomers} customersPaused={customersPaused || reducedMotion} economy={economy} cityPaused={cityPaused || reducedMotion} cloudQuality={cloudQuality} weather={weather} reducedMotion={reducedMotion || rainPaused} componentId={componentId} snapshot={snapshot} layout={layout} manifest={manifest} mode={sceneMode} cameraView={cameraView} cameraRevision={cameraRevision} showLabels={showLabels} fixedCenter={planning ? [0, 0] : undefined} referenceRegions={planning && planningResult ? planningResult.report.referenceRegions : undefined} /></SceneBoundary>
           </div>
         </ResizablePanel>
 
         <ResizableHandle aria-label="调整场景与 Agent 对话框宽度" className="workbench-split-handle" />
 
         <ResizablePanel id="yh-agent" className="agent-pane" defaultSize={32} minSize={24} maxSize={48}>
-          <AgentShell key={incidentMode ? 'incident' : followClock ? 'operating-live' : `operating-manual-${scenarioAt}`}
+          <AgentShell merchandising={trial.merchandise} merchandisingSubmission={trial.submission}
+            selectedSlotId={selectedSlotId} onSelectSlot={setSelectedSlotId} onInjectStock={trial.inject}
+            key={incidentMode ? 'incident' : followClock ? 'operating-live' : `operating-manual-${scenarioAt}`}
             view={view}
             onViewChange={setView}
             snapshot={snapshot}

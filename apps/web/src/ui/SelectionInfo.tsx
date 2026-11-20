@@ -1,9 +1,9 @@
 /** 选中详情：分区 KPI / 设施语义信息；无数据时如实显示，绝不补假数（US-14、AT-03）。 */
-import type { TwinSnapshot } from '@yh/contracts';
+import type { MerchandisingSnapshot, StoreLayout, TwinSnapshot } from '@yh/contracts';
 import { LocateFixed } from 'lucide-react';
 import { BeautifulButton } from './beautiful/Button';
 import './ReviewTabs.css';
-import { layout } from '../data';
+import './SelectionInfo.css';
 import { useWorkbench } from '../state';
 
 const METRIC_LABELS: Record<string, string> = {
@@ -29,7 +29,59 @@ function KindBadge({ kind, stale }: { kind: string; stale: boolean }): React.JSX
   );
 }
 
-export function SelectionInfo({ snapshot }: { snapshot: TwinSnapshot }) {
+interface SelectionInfoProps {
+  snapshot: TwinSnapshot;
+  layout: StoreLayout;
+  merchandising?: MerchandisingSnapshot;
+  selectedSlotId?: string;
+  onSelectSlot?: (slotId: string) => void;
+  onInjectStock?: (sku: string, fixtureId: string) => void;
+}
+
+function FixtureMerchandising({fixtureId, merchandising, selectedSlotId, onSelectSlot, onInjectStock}: Pick<SelectionInfoProps, 'selectedSlotId' | 'onSelectSlot' | 'onInjectStock'> & {
+  fixtureId: string;
+  merchandising?: MerchandisingSnapshot;
+}) {
+  if (!merchandising?.coveredFixtureIds.includes(fixtureId)) return null;
+  const placements = merchandising.placements.filter(placement => placement.fixtureId === fixtureId);
+  const placement = placements.find(entry => entry.slotId === selectedSlotId)
+    ?? placements.find(entry => entry.origin === 'USER_SANDBOX')
+    ?? placements[0];
+  const product = merchandising.products.find(item => item.sku === placement?.sku);
+  const reading = merchandising.inventory.find(item => item.sku === placement?.sku && item.fixtureId === fixtureId);
+  const available = reading != null && reading.onHand != null && !reading.stale && reading.kind !== 'UNKNOWN';
+  return (
+    <section className="yh-selection-placement" aria-label="设施陈列与库存">
+      <h4>商品陈列 · 教学模式</h4>
+      <p>已知 {placements.length} 个陈列位置 · 陈列数量不是库存。</p>
+      {placement && (
+        <>
+          <label>查看货位
+            <select value={placement.slotId} disabled={!onSelectSlot} onChange={event=>onSelectSlot?.(event.currentTarget.value)}>
+              {placements.map(entry=><option key={entry.slotId} value={entry.slotId}>{entry.slotId} · {entry.sku}</option>)}
+            </select>
+          </label>
+          <dl className="yh-review-kv">
+            <dt>当前 SKU</dt><dd><code>{placement.sku}</code>{product && ` · ${product.name}`}</dd>
+            <dt>陈列来源</dt><dd>{placement.origin === 'USER_SANDBOX' ? '本机单格试摆' : '原始教学陈列'}</dd>
+            <dt>库存</dt><dd>{available ? `${reading.onHand} 件 · 合成观测（${reading.kind}）` : '无可靠观测（UNKNOWN，不代表 0 件）'}</dd>
+            {reading?.stale && <><dt>状态</dt><dd>最近库存观测已过期，不用于决策。</dd></>}
+            {reading?.sourceId && <><dt>来源</dt><dd>{reading.sourceId}</dd></>}
+            {reading?.observedAt && <><dt>观测时间</dt><dd><time dateTime={reading.observedAt}>{reading.observedAt}</time></dd></>}
+            {!!reading?.evidenceIds.length && <><dt>证据</dt><dd>{reading.evidenceIds.join('、')}</dd></>}
+          </dl>
+          {fixtureId === 'F077' && onInjectStock && (
+            <BeautifulButton size="sm" variant="secondary" onClick={()=>onInjectStock(placement.sku,fixtureId)}>
+              注入合成库存观测
+            </BeautifulButton>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+export function SelectionInfo({ snapshot, layout, merchandising, selectedSlotId, onSelectSlot, onInjectStock }: SelectionInfoProps) {
   const selection = useWorkbench((s) => s.selection);
   const select = useWorkbench((s) => s.select);
   if (selection === null) {
@@ -65,9 +117,14 @@ export function SelectionInfo({ snapshot }: { snapshot: TwinSnapshot }) {
           <dd>
             {fixture.widthM} × {fixture.depthM} × {fixture.heightM} m（教学假设）
           </dd>
+          <dt>位置</dt>
+          <dd>{fixture.x} × {fixture.y} × {fixture.z} m（当前布局）</dd>
           <dt>容量</dt>
           <dd>{fixture.capacity ?? '—'}</dd>
         </dl>
+        {merchandising?.storeId === layout.storeId && merchandising.at === snapshot.atTime && (
+          <FixtureMerchandising fixtureId={fixture.fixtureId} merchandising={merchandising} selectedSlotId={selectedSlotId} onSelectSlot={onSelectSlot} onInjectStock={onInjectStock} />
+        )}
         {fixtureState !== undefined && Object.keys(fixtureState.kpis).length > 0 && (
           <>
             <h4>设施级读数</h4>

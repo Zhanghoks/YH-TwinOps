@@ -1,0 +1,22 @@
+.yh-scene-failure {
+  position: absolute; inset: 58px 0 70px; box-sizing: border-box; overflow: auto;
+  display: flex; justify-content: flex-start; flex-direction: column; gap: 10px;
+  padding: 18px clamp(14px, 3vw, 32px); color: #243b33;
+  background: #eff4f1;
+}
+.yh-scene-status { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.yh-scene-status h2 { font-size: 1.1rem; margin: 0; }
+.yh-scene-status p { flex-basis: 100%; margin: 0; color: #486456; font-size: .86rem; }
+.yh-scene-status button, .yh-plan-header select {
+  border: 1px solid #a1b5a8; background: #fff; border-radius: 8px; color: inherit; padding: .35rem .65rem;
+}
+.yh-plan-fallback { width: min(100%, 720px); margin-inline: auto; display: grid; gap: .45rem; }
+.yh-plan-header, .yh-plan-selection { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; font-size: .8rem; }
+.yh-plan-map { display: block; width: 100%; height: clamp(150px, 43vh, 490px); background: #f9fbfa; border: 1px solid #c8d7cd; border-radius: 10px; }
+.yh-plan-floor { fill: #f1f6f3; stroke: #587969; stroke-width: .24; }
+.yh-plan-zone { fill: #c9ded1; fill-opacity: .4; stroke: #86a794; stroke-width: .19; }
+.yh-plan-fixture { fill: #627e71; cursor: pointer; }
+.yh-plan-fixture:hover, .yh-plan-fixture[data-selected="true"] { fill: #0b644d; stroke: #f4ae42; stroke-width: .32; }
+@media (max-width: 720px) {
+  .yh-scene-failure { inset-block: 50px 60px; padding: 10px 14px; }
+}

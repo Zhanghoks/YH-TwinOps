@@ -157,3 +157,24 @@ it('keeps newline and whitespace behavior and reports API fallback honestly',asy
   expect(screen.getByText(/服务端助手暂不可用，已改用浏览器内本地规则/)).toBeTruthy();
   expect(askStoreAgent).toHaveBeenCalled();
 });
+
+it('caps evidence cards while preserving all 160 machine-readable records behind disclosure',async()=>{
+  const {fetchAgentStatus,askStoreAgent}=await import('../api');
+  vi.mocked(fetchAgentStatus).mockResolvedValueOnce({ok:true,service:'yh-agent',engine:'rules-local',model:'test-rules',note:'test'});
+  const evidence=Array.from({length:160},(_,i)=>({signalId:'F077/slot-'+i,metric:'product_placement',observedAt:TEST_AT,sourceId:i===159?'browser-sandbox-placement':'synthetic-placement-seed',kind:'SIMULATED' as const,synthetic:true,confidence:null}));
+  vi.mocked(askStoreAgent).mockResolvedValueOnce({answer:'YH-LOCAL-001 已试摆 slot-159；库存 UNKNOWN。',mode:'rules-local',toolCalls:[{tool:'get_fixture_products',args:{fixtureId:'F077'}},{tool:'get_sku_inventory',args:{sku:'YH-LOCAL-001'}}],evidence,cannotJudge:[]});
+  const user=userEvent.setup();
+  render(<AgentPanel tools={tools} signals={signals} layout={layout} at={TEST_AT}/>);
+  await screen.findByText('服务端本地规则 · test-rules');
+  await user.type(screen.getByLabelText('向门店助手提问'),'F077 放了什么商品？');
+  await user.click(screen.getByRole('button',{name:'提问'}));
+  await screen.findByText('YH-LOCAL-001 已试摆 slot-159；库存 UNKNOWN。');
+  await user.click(screen.getByRole('button',{name:'展开证据与工具轨迹'}));
+  expect(document.querySelectorAll('.ba-context-card')).toHaveLength(6);
+  expect(document.querySelector('.ba-context-card')?.textContent).toContain('F077/slot-159');
+  const disclosure=screen.getByText('完整证据 JSON（160 条）').closest('details')!;
+  expect(disclosure.open).toBe(false);
+  await user.click(screen.getByText('完整证据 JSON（160 条）'));
+  expect(disclosure.open).toBe(true);
+  expect(JSON.parse(disclosure.querySelector('pre')!.textContent!)).toEqual(evidence);
+});

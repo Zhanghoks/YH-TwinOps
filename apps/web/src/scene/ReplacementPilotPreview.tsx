@@ -1,3 +1,4 @@
+import type {ShelfSlotReplacement} from '../catalog/merchandisingAdapter';
 import {buildSameSkuFill,type SameSkuFillRequest} from './sameSkuFill';
 import {buildServiceGroupReplacement,isServiceGroupReplacementFixture} from './serviceGroupReplacement';
 import {makeServiceGroupReplacement,disposeServiceGroupReplacement} from './serviceGroupReplacementThree';
@@ -12,7 +13,7 @@ import {buildFreshGroupReplacement,isDenseFreshFixture} from './freshGroupReplac
 import {makeFreshGroupReplacement,disposeFreshGroupReplacement} from './freshGroupReplacementThree';
 export function isReplacementPilotFixture(f:Fixture){return isShelfGroupReplacementFixture(f)||isDenseFreshFixture(f)||isServiceGroupReplacementFixture(f)||isDenseCheckoutReplacement(f);}
 /** Same fixture identity, independent reversible visual asset; no state writes. */
-export function ReplacementPilotPreview({fixture,stocked,selected,onSelect,fillRequest}:{fixture:Fixture;stocked:boolean;selected:boolean;onSelect:(id:string)=>void;fillRequest?:SameSkuFillRequest}){
+export function ReplacementPilotPreview({fixture,stocked,selected,onSelect,fillRequest,placementReplacement}:{fixture:Fixture;stocked:boolean;selected:boolean;onSelect:(id:string)=>void;fillRequest?:SameSkuFillRequest;placementReplacement?:ShelfSlotReplacement}){
  const [lod,setLod]=useState<'near'|'far'>('near');
  useFrame(({camera})=>{const d=Math.hypot(camera.position.x-fixture.x,camera.position.y-fixture.y,camera.position.z-fixture.z);const next=selected?'near':lod==='near'?(d>42?'far':'near'):(d<34?'near':'far');if(next!==lod)setLod(next);});
  const result=useMemo(()=>{
@@ -21,10 +22,10 @@ export function ReplacementPilotPreview({fixture,stocked,selected,onSelect,fillR
   const checkout=buildCheckoutReplacement(fixture,{stocked,lod});
   if(checkout)return {group:makeCheckoutReplacement(checkout),envelope:checkout.replacementEnvelopeM,dispose:disposeCheckoutReplacement};
   const shelf=buildShelfGroupReplacement(fixture,{stocked,lod});
-  if(shelf)return {group:makeShelfGroupReplacement(shelf,{fillPlan:fillRequest&&fixture.fixtureId==='F077'?buildSameSkuFill(fixture,fillRequest):undefined}),envelope:shelf.replacementEnvelopeM,dispose:disposeShelfGroupReplacement};
+  if(shelf)return {group:makeShelfGroupReplacement(shelf,{placementReplacement:fixture.fixtureId==='F077'?placementReplacement:undefined,fillPlan:fillRequest&&fixture.fixtureId==='F077'?buildSameSkuFill(fixture,fillRequest):undefined}),envelope:shelf.replacementEnvelopeM,dispose:disposeShelfGroupReplacement};
   const fresh=buildFreshGroupReplacement(fixture,{stocked,lod});
   return fresh?{group:makeFreshGroupReplacement(fresh),envelope:fresh.replacementEnvelopeM,dispose:disposeFreshGroupReplacement}:null;
- },[fixture,stocked,lod,fillRequest]);
+ },[fixture,stocked,lod,fillRequest,placementReplacement]);
  useEffect(()=>()=>{if(result)result.dispose(result.group);},[result]);
  if(!result)return null;
  const [w,h,d]=result.envelope;

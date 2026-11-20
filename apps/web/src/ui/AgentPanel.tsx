@@ -19,7 +19,7 @@ import {
 } from '@ui-sdk/react/scroll-area';
 import type { AgentEvidence, AgentTools } from '@yh/agent/tools';
 import { answerLocally, type AgentAnswer } from '@yh/agent/rules';
-import type { StoreLayout, TwinSignal } from '@yh/contracts';
+import type { StoreLayout, TwinSignal, MerchandisingSubmission } from '@yh/contracts';
 import {
   askStoreAgent,
   fetchAgentStatus,
@@ -45,10 +45,13 @@ interface ChatTurn {
 
 function EvidenceList({ evidence }: { evidence: AgentEvidence[] }) {
   if (evidence.length === 0) return <p className="muted">（本回答无证据引用）</p>;
-  return <ContextCards labels={{header:'依据来源',count:String(evidence.length)}} chunks={evidence.map((e,i)=>({
+  const ordered=[...evidence].sort((a,b)=>Number(b.sourceId==='browser-sandbox-placement'||b.metric==='sku_inventory')-Number(a.sourceId==='browser-sandbox-placement'||a.metric==='sku_inventory'));
+  return <><ContextCards labels={{header:'依据来源',count:String(evidence.length)}} chunks={ordered.slice(0,6).map((e,i)=>({
     id:`${e.signalId}-${i}`,title:e.metric,chars:e.synthetic?'合成信号':e.kind,source:e.sourceId,badge:e.synthetic?'S':'D',
     body:<><code className="ba-signal-id">{e.signalId}</code><dl className="ba-evidence-fields"><div><dt>来源</dt><dd>{e.sourceId}</dd></div><div><dt>时间</dt><dd>{e.observedAt}</dd></div><div><dt>置信</dt><dd>{e.confidence??'—'}</dd></div><div><dt>类型</dt><dd>{e.kind}</dd></div></dl></>,
-  }))}/>;
+  }))}/>
+  {evidence.length>6&&<p className="ba-engine-record">先显示 6 条关键证据，共 {evidence.length} 条。</p>}
+  <details className="ba-evidence-json"><summary>完整证据 JSON（{evidence.length} 条）</summary><pre>{JSON.stringify(evidence,null,2)}</pre></details></>;
 
 }
 
@@ -83,9 +86,10 @@ export interface AgentPanelProps {
   signals: TwinSignal[];
   layout: StoreLayout;
   at: string;
+  merchandisingSubmission?: MerchandisingSubmission;
 }
 
-export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): React.JSX.Element {
+export function AgentPanel({ tools, signals, layout, at, merchandisingSubmission }: AgentPanelProps): React.JSX.Element {
   const requestCounter = useRef(0);
   const requestPending = useRef(false);
   const [question, setQuestion] = useState('');
@@ -134,7 +138,7 @@ export function AgentPanel({ tools, signals, layout, at }: AgentPanelProps): Rea
     let answer: StoreAgentAnswer;
     try {
       if (transport === 'api') {
-        answer = await askStoreAgent({ question: q, at, layout, signals });
+        answer = await askStoreAgent({ question: q, at, layout, signals, merchandising:merchandisingSubmission });
       } else {
         answer = answerLocally(q, tools) as AgentAnswer;
       }

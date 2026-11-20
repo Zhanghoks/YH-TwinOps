@@ -1,3 +1,5 @@
+import type { MerchandisingSnapshot } from '@yh/contracts';
+import { createMerchandiseTools } from './merchandise-tools';
 import {
   METRICS,
   isDecisionUsable,
@@ -37,6 +39,8 @@ export interface AgentToolResult {
 }
 
 export interface AgentTools {
+  get_fixture_products(args: { fixtureId: string }): AgentToolResult;
+  get_sku_inventory(args: { sku: string; fixtureId?: string }): AgentToolResult;
   get_store_overview(): AgentToolResult;
   get_zone_snapshot(args: { zoneId: string }): AgentToolResult;
   query_sales(args: { windowMin: number; zoneId?: string }): AgentToolResult;
@@ -105,6 +109,7 @@ function windowQuery(
 }
 
 export interface AgentToolDeps {
+  merchandise?: MerchandisingSnapshot;
   snapshot: TwinSnapshot;
   /** 投影所用的原始信号流（供窗口聚合与证据追溯）。 */
   signals: TwinSignal[];
@@ -125,6 +130,7 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
     });
 
   return {
+    ...createMerchandiseTools(deps.merchandise, snapshot.storeId, asOf),
     get_store_overview: () => ({
       status: 'OK',
       data: {
